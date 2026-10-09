@@ -13,7 +13,7 @@ import { Icon } from '../components/Icon'
 import { RichText } from '../components/RichText'
 import { verifyAiMath } from '../engine/solver'
 import { isGrounded } from '../ai/guard'
-import { shuffle } from '../engine/rand'
+import { gcd, shuffle } from '../engine/rand'
 import { aiReady as isAiReady } from '../ai/llm'
 import { sfx } from '../lib/sfx'
 import { hintMessages, stream, useAi, whyWrongMessages } from '../ai/llm'
@@ -59,10 +59,16 @@ export function LessonScreen() {
   const progress = correctCount / total
 
   const CHEER: Mood[] = ['jump', 'thumbsup', 'clap']
-  const mood: Mood = phase === 'correct' ? (combo >= 3 ? 'dance' : CHEER[idx % 3]) : phase === 'wrong' ? (idx % 2 ? 'oops' : 'sad') : aiOpen ? 'eureka' : q.kind === 'input' ? 'typing' : 'think'
+  const mood: Mood = phase === 'correct' ? (combo >= 3 ? 'dance' : CHEER[idx % 3]) : phase === 'wrong' ? (idx % 2 ? 'oops' : 'sad') : aiOpen ? 'eureka' : q.kind === 'pizzaChef' ? 'pizza' : q.kind === 'input' ? 'typing' : 'think'
 
   const answerDisplayLatex = (q: Question) =>
-    q.kind === 'input' ? q.answers[0] : q.kind === 'choice' ? q.choices[q.correctIndex].latex ?? '' : ''
+    q.kind === 'input'
+      ? q.answers[0]
+      : q.kind === 'choice'
+        ? q.choices[q.correctIndex].latex ?? ''
+        : q.kind === 'pizzaChef'
+          ? `\\frac{${q.targetNum}}{${q.targetDen}}`
+          : ''
 
   const current = q.kind === 'input' ? latex : value
 
@@ -128,7 +134,14 @@ export function LessonScreen() {
     setAiOpen('why')
     setAiText('')
     const fallback = `Ganito ang tamang paraan:\n${q.solution.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
-    const typed = q.kind === 'input' ? latex : q.kind === 'choice' ? (q.choices[value as number]?.latex ?? q.choices[value as number]?.text ?? '') : String(value)
+    const typed =
+      q.kind === 'input'
+        ? latex
+        : q.kind === 'choice'
+          ? (q.choices[value as number]?.latex ?? q.choices[value as number]?.text ?? '')
+          : q.kind === 'pizzaChef' && value && typeof value === 'object' && 'num' in value
+            ? `${(value as { num: number; den: number }).num}/${(value as { num: number; den: number }).den}`
+            : String(value)
     const out = await stream(whyWrongMessages(level, q, typed, aiLang), setAiText, fallback, 260)
     const src = [q.prompt, q.latex ?? '', q.answerDisplay, typed, ...q.solution, ...q.hints]
     setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
@@ -167,7 +180,7 @@ export function LessonScreen() {
               {missed.has(q.id) && idx >= total ? (
                 <><Icon name="history" size={20} /> Balikan natin</>
               ) : (
-                <><span className="px-2 py-0.5 rounded-lg text-white" style={{ background: world.color }}>{q.kind === 'input' ? 'Sagutan' : q.kind === 'choice' ? 'Piliin' : q.kind === 'tiles' ? 'Buuin' : 'I-tap'}</span><Icon name={stage.icon} size={20} /> {stage.title}</>
+                <><span className="px-2 py-0.5 rounded-lg text-white" style={{ background: world.color }}>{q.kind === 'input' ? 'Sagutan' : q.kind === 'choice' ? 'Piliin' : q.kind === 'tiles' ? 'Buuin' : q.kind === 'pizzaChef' ? 'Pizza Chef' : 'I-tap'}</span><Icon name={stage.icon} size={20} /> {stage.title}</>
               )}
             </div>
             <div className="flex items-start gap-3 mb-4">
@@ -179,7 +192,7 @@ export function LessonScreen() {
             </div>
 
             {q.visual && <div className="flex justify-center my-4"><VisualView v={q.visual} /></div>}
-            {q.latex && q.visual?.type !== 'scale' && (
+            {q.latex && q.visual?.type !== 'scale' && q.kind !== 'pizzaChef' && (
               <div className="text-center text-[30px] my-4 font-semibold"><Tex tex={q.latex} /></div>
             )}
 
@@ -194,6 +207,7 @@ export function LessonScreen() {
               {q.kind === 'choice' && <ChoiceList q={q} value={value as number | null} onPick={(i) => phase === 'answer' && (sfx.tap(), setValue(i))} locked={phase !== 'answer'} />}
               {q.kind === 'tiles' && <TilesBoard q={q} value={(value as string[]) ?? []} onChange={setValue} locked={phase !== 'answer'} />}
               {q.kind === 'numberline' && <NumberLine q={q} value={value as number | null} onPick={(i) => phase === 'answer' && (sfx.tap(), setValue(i))} />}
+              {q.kind === 'pizzaChef' && <PizzaChefBoard q={q} value={value as { den: number; num: number } | null} onChange={(v) => setValue(v)} locked={phase !== 'answer'} />}
             </div>
 
             {nudge && <div className="mt-3 rounded-xl bg-sun-soft text-ink font-bold px-3 py-2 text-[15px] flex items-center gap-2"><Icon name="bulb" size={22} /> {nudge}</div>}
@@ -223,7 +237,17 @@ export function LessonScreen() {
         />
       ) : (
         <div className="px-5 pb-6 pt-3 border-t-2 border-line safe-bottom">
-          <Button tone="leaf" className="w-full" disabled={phase === 'answer' && (value === null || (Array.isArray(value) && value.length === 0))} onClick={phase === 'answer' ? check : next}>
+          <Button
+            tone="leaf"
+            className="w-full"
+            disabled={
+              phase === 'answer' &&
+              (value === null ||
+                (Array.isArray(value) && value.length === 0) ||
+                (typeof value === 'object' && value !== null && 'num' in value && (value as { num: number }).num === 0))
+            }
+            onClick={phase === 'answer' ? check : next}
+          >
             {phase === 'answer' ? 'Check' : 'Tuloy'}
           </Button>
         </div>
@@ -346,3 +370,137 @@ function NumberLine({ q, value, onPick }: { q: Extract<Question, { kind: 'number
     </div>
   )
 }
+
+function PizzaChefBoard({
+  q,
+  onChange,
+  locked,
+}: {
+  q: Extract<Question, { kind: 'pizzaChef' }>
+  value?: { den: number; num: number } | null
+  onChange: (val: { den: number; num: number }) => void
+  locked: boolean
+}) {
+  const [slices, setSlices] = useState<number>(() => q.allowedSlices[0] || q.targetDen)
+  const [topped, setTopped] = useState<Set<number>>(new Set())
+
+  const toggleSlice = (i: number) => {
+    if (locked) return
+    sfx.tap()
+    const next = new Set(topped)
+    if (next.has(i)) next.delete(i)
+    else next.add(i)
+    setTopped(next)
+    onChange({ den: slices, num: next.size })
+  }
+
+  const changeSlices = (count: number) => {
+    if (locked) return
+    sfx.tap()
+    setSlices(count)
+    setTopped(new Set())
+    onChange({ den: count, num: 0 })
+  }
+
+  const r = 84, cx = 100, cy = 100
+  const slicePaths = Array.from({ length: slices }, (_, i) => {
+    const a0 = (i / slices) * Math.PI * 2 - Math.PI / 2
+    const a1 = ((i + 1) / slices) * Math.PI * 2 - Math.PI / 2
+    const large = a1 - a0 > Math.PI ? 1 : 0
+    const d = `M${cx},${cy} L${cx + r * Math.cos(a0)},${cy + r * Math.sin(a0)} A${r},${r} 0 ${large} 1 ${cx + r * Math.cos(a1)},${cy + r * Math.sin(a1)} Z`
+    const isTopped = topped.has(i)
+    const mid = (a0 + a1) / 2
+    return { d, isTopped, mid }
+  })
+
+  const toppedCount = topped.size
+  const g = gcd(toppedCount, slices)
+  const simplifiedTex = toppedCount > 0 && g > 1 ? ` = \\frac{${toppedCount / g}}{${slices / g}}` : ''
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* Slicing Controls */}
+      {q.allowedSlices.length > 1 && (
+        <div className="mb-3 flex items-center gap-1.5 bg-cloud p-1 rounded-2xl border-2 border-line">
+          <span className="text-[11px] font-black uppercase text-ink-soft px-2">Hiwain:</span>
+          {q.allowedSlices.map((count) => {
+            const active = slices === count
+            return (
+              <button
+                key={count}
+                type="button"
+                disabled={locked}
+                onClick={() => changeSlices(count)}
+                className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                  active ? 'bg-sun text-ink shadow-[0_2px_0_var(--color-sun-dark)]' : 'bg-white text-ink-soft hover:text-ink'
+                }`}
+              >
+                {count} hiwa
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Interactive Pizza */}
+      <div className="relative select-none touch-manipulation my-1">
+        <svg viewBox="0 0 200 200" width="220" height="220" className="drop-shadow-[0_8px_16px_rgba(200,140,60,.25)]">
+          {/* Crust background */}
+          <circle cx={cx} cy={cy} r={r + 6} fill="#E2A65E" stroke="#C48438" strokeWidth="2.5" />
+          {/* Pizza Slices */}
+          {slicePaths.map((s, i) => (
+            <g
+              key={i}
+              onClick={() => toggleSlice(i)}
+              className="cursor-pointer transition-transform active:scale-[0.98]"
+            >
+              <path
+                d={s.d}
+                fill={s.isTopped ? '#FFC83D' : '#FFF5E0'}
+                stroke="#C48438"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                className="transition-colors duration-200"
+              />
+              {/* Toppings (Pepperoni / Cheese) */}
+              {s.isTopped && (
+                <>
+                  <circle cx={cx + r * 0.58 * Math.cos(s.mid)} cy={cy + r * 0.58 * Math.sin(s.mid)} r="8" fill="#E2483D" />
+                  <circle cx={cx + r * 0.58 * Math.cos(s.mid) - 2} cy={cy + r * 0.58 * Math.sin(s.mid) - 2} r="2.5" fill="#FFA59E" opacity="0.8" />
+                  {slices <= 6 && (
+                    <>
+                      <circle cx={cx + r * 0.78 * Math.cos(s.mid + 0.14)} cy={cy + r * 0.78 * Math.sin(s.mid + 0.14)} r="5.5" fill="#E2483D" />
+                      <circle cx={cx + r * 0.78 * Math.cos(s.mid + 0.14) - 1.5} cy={cy + r * 0.78 * Math.sin(s.mid + 0.14) - 1.5} r="1.8" fill="#FFA59E" opacity="0.8" />
+                    </>
+                  )}
+                  <circle cx={cx + r * 0.35 * Math.cos(s.mid)} cy={cy + r * 0.35 * Math.sin(s.mid)} r="2" fill="#3DBE6B" />
+                </>
+              )}
+              {/* Subtle tap target dot if untouched */}
+              {!s.isTopped && (
+                <circle cx={cx + r * 0.58 * Math.cos(s.mid)} cy={cy + r * 0.58 * Math.sin(s.mid)} r="3" fill="#D9CBB0" opacity="0.6" />
+              )}
+            </g>
+          ))}
+          {/* Center crust ring */}
+          <circle cx={cx} cy={cy} r={6} fill="#E2A65E" stroke="#C48438" strokeWidth="1.5" />
+        </svg>
+      </div>
+
+      {/* Real-time fraction indicator */}
+      <div className="mt-3 px-4 py-2 rounded-2xl bg-sun-soft border-2 border-sun text-ink flex items-center gap-2">
+        <Icon name="pizza" size={24} />
+        <span className="text-sm font-bold">
+          May toppings: <b>{toppedCount}</b> sa <b>{slices}</b>
+        </span>
+        <span className="text-xl font-bold ml-1">
+          <Tex tex={`\\frac{${toppedCount}}{${slices}}${simplifiedTex}`} />
+        </span>
+      </div>
+      <div className="text-[12px] font-bold text-ink-soft mt-1.5 flex items-center gap-1">
+        <Icon name="bulb" size={16} /> I-tap ang hiwa para lagyan o alisin ang toppings
+      </div>
+    </div>
+  )
+}
+

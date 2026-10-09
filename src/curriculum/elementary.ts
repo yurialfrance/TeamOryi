@@ -211,3 +211,45 @@ export const fractionWord: Generator = () => {
   return q
 }
 
+/** Interactive Pizza Fraction Chef: slice, top, and serve fractional portions */
+export const pizzaChefGen: Generator = () => {
+  const customer = pick(['Pipo', 'Aling Nena', 'Mang Kanor', 'Kuya Jun', 'Ate Sarah'])
+  const pairs: [number, number, number[]][] = [
+    [1, 2, [2, 4, 6, 8]],
+    [1, 3, [3, 6]],
+    [2, 3, [3, 6]],
+    [1, 4, [4, 8]],
+    [3, 4, [4, 8]],
+    [3, 8, [8]],
+    [5, 8, [8]],
+  ]
+  const [num, den, allowed] = pick(pairs)
+  const topping = pick(['pepperoni', 'cheese', 'mushroom'] as const)
+  const toppingTagalog = topping === 'pepperoni' ? 'pepperoni' : topping === 'cheese' ? 'keso' : 'kabute'
+
+  return {
+    id: uid(),
+    kind: 'pizzaChef',
+    targetNum: num,
+    targetDen: den,
+    allowedSlices: allowed,
+    topping,
+    prompt: `Chef Pipo! Umorder si ${customer} ng ${num}/${den} ng pizza na may ${toppingTagalog}. Piliin kung ilang hiwa, tapos i-tap ang mga hiwa para lagyan ng toppings bago i-serve!`,
+    latex: frac(num, den),
+    answerDisplay: `${num}/${den}`,
+    hints: [
+      `Tingnan ang order: kailangan ng ${num} sa bawat ${den} na hiwa.`,
+      allowed.length > 1
+        ? `Maaari mong hiwain ang pizza sa ${allowed.join(', ')} na hiwa, tapos lagyan ng toppings ang katumbas na bahagi.`
+        : `Hiwain sa ${den} na piraso, tapos i-tap ang ${num} na hiwa para lagyan ng toppings.`,
+    ],
+    solution: [
+      `Ang hininging fraction ay ${num}/${den}.`,
+      `Kung hahatiin sa ${den} na hiwa, lagyan ng toppings ang ${num} na hiwa.`,
+      allowed.length > 1 && allowed.includes(den * 2)
+        ? `Pwede rin kung hiwain sa ${den * 2} at lagyan ng toppings ang ${num * 2} (equivalent fraction: ${num}/${den} = ${num * 2}/${den * 2}).`
+        : `I-tap ang mga hiwa para maging eksaktong ${num}/${den}.`,
+    ],
+  }
+}
+

@@ -64,6 +64,14 @@ export interface NumberLineQuestion extends QuestionBase {
   labelEvery?: number
 }
 
-export type Question = ChoiceQuestion | InputQuestion | TilesQuestion | NumberLineQuestion
+export interface PizzaChefQuestion extends QuestionBase {
+  kind: 'pizzaChef'
+  targetNum: number
+  targetDen: number
+  allowedSlices: number[] // e.g. [2, 3, 4, 6, 8]
+  topping: 'pepperoni' | 'cheese' | 'mushroom'
+}
+
+export type Question = ChoiceQuestion | InputQuestion | TilesQuestion | NumberLineQuestion | PizzaChefQuestion
 
 export type Generator = () => Question

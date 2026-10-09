@@ -91,11 +91,11 @@ export const WORLDS: World[] = [
     soft: '#FFF0E0',
     tabs: ['basic'],
     stages: [
-      { id: 'e1', title: 'Ano ang Fraction?', icon: 'pizza', competency: 'Represents fractions using regions and the number line', gens: [E.identifyFraction, E.identifyFraction, E.fractionNumberLine] },
-      { id: 'e2', title: 'Magkapantay na Fractions', icon: 'scale', competency: 'Identifies and generates equivalent fractions', gens: [E.equivalentFraction] },
+      { id: 'e1', title: 'Ano ang Fraction?', icon: 'pizza', competency: 'Represents fractions using regions and the number line', gens: [E.identifyFraction, E.fractionNumberLine, E.pizzaChefGen] },
+      { id: 'e2', title: 'Magkapantay na Fractions', icon: 'scale', competency: 'Identifies and generates equivalent fractions', gens: [E.equivalentFraction, E.pizzaChefGen] },
       { id: 'e3', title: 'Alin ang Mas Malaki?', icon: 'magnifier', competency: 'Compares fractions with the same numerator or denominator', gens: [E.compareFractions, E.fractionNumberLine] },
       { id: 'e4', title: 'Pagsasama ng Hiwa', icon: 'plus', competency: 'Adds and subtracts similar fractions in lowest terms', gens: [E.addSimilar] },
-      { id: 'e5', title: 'Pizza Party!', icon: 'party', competency: 'Solves word problems involving fractions', gens: [E.fractionWord, E.addSimilar] },
+      { id: 'e5', title: 'Pizza Party!', icon: 'party', competency: 'Solves word problems involving fractions', gens: [E.fractionWord, E.pizzaChefGen, E.addSimilar] },
     ],
   },
   {

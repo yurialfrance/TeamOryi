@@ -111,5 +111,13 @@ export function checkAnswer(q: Question, value: unknown): Verdict {
       return checkInput(q, String(value ?? ''))
     case 'tiles':
       return checkTiles(q, (value as string[]) ?? [])
+    case 'pizzaChef': {
+      if (!value || typeof value !== 'object') return 'empty'
+      const v = value as { den: number; num: number }
+      if (!v.num || v.num === 0) return 'empty'
+      const target = q.targetNum / q.targetDen
+      const got = v.num / v.den
+      return Math.abs(got - target) < 1e-9 ? 'correct' : 'wrong'
+    }
   }
 }
