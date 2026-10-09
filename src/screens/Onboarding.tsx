@@ -21,9 +21,14 @@ export function Onboarding() {
   const [level, setLevel] = useState<World['id']>('elem')
   const [goal, setGoal] = useState(20)
 
-  const finish = () => set({ onboarded: true, name: name.trim() || 'Kaibigan', level, dailyGoal: goal, screen: 'path' })
+  const isNameValid = name.trim().length > 0
+
+  const finish = () => {
+    if (!isNameValid) return
+    set({ onboarded: true, name: name.trim(), level, dailyGoal: goal, screen: 'path' })
+  }
   const bubble = [
-    'Kumusta! Ako si Pipo. Tutulungan kitang maging magaling sa math — paunti-unti, araw-araw!',
+    'Kumusta! Ako si Pipo. Tutulungan kitang maging magaling sa math â€” paunti-unti, araw-araw!',
     'Anong level mo ngayon?',
     'Ilang XP ang goal mo kada araw?',
     'Last na! Gusto mo bang i-download ang aking AI utak? Gumagana ito kahit walang internet!',
@@ -32,7 +37,7 @@ export function Onboarding() {
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="px-5 pt-5 flex items-center gap-3">
-        {step > 0 && <button className="text-2xl text-ink-soft font-black" onClick={() => setStep(step - 1)}>←</button>}
+        {step > 0 && <button className="text-2xl text-ink-soft font-black" onClick={() => setStep(step - 1)}>â†</button>}
         <ProgressBar value={(step + 1) / 4} />
       </div>
 
@@ -62,7 +67,7 @@ export function Onboarding() {
                   {([
                     ['book', <>Sumusunod sa <b>DepEd MATATAG</b> at <b>CHED GE</b></>],
                     ['stairs', <>Stage by stage, parang laro</>],
-                    ['shield', <>Ang AI ay nasa phone mo — walang data na lumalabas</>],
+                    ['shield', <>Ang AI ay nasa phone mo â€” walang data na lumalabas</>],
                   ] as const).map(([ic, t], i) => (
                     <div key={i} className="flex items-center gap-3 p-2"><Icon name={ic} size={30} /><span>{t}</span></div>
                   ))}
@@ -91,7 +96,7 @@ export function Onboarding() {
                     className={`btn3d flex items-center justify-between p-4 border-2 bg-white ${goal === g.xp ? 'border-sky bg-sky-soft' : 'border-line'}`}
                     style={{ ['--shadow' as string]: goal === g.xp ? 'var(--color-sky)' : '#E0D9E8' }}>
                     <span className="flex items-center gap-2 font-black text-lg"><Icon name={(['steps', 'bolt', 'flame', 'crown'] as const)[GOALS.indexOf(g)]} size={28} />{g.label}</span>
-                    <span className="text-ink-soft font-bold">{g.note} · {g.xp} XP</span>
+                    <span className="text-ink-soft font-bold">{g.note} Â· {g.xp} XP</span>
                   </button>
                 ))}
               </div>
@@ -102,7 +107,7 @@ export function Onboarding() {
       </div>
 
       <div className="px-5 pb-6 pt-3 border-t-2 border-line safe-bottom">
-        <Button tone={step === 3 ? 'leaf' : 'sky'} className="w-full" onClick={() => (step < 3 ? setStep(step + 1) : finish())}>
+        <Button tone={step === 3 ? 'leaf' : 'sky'} className="w-full" disabled={step === 0 && !isNameValid} onClick={() => { if (step === 0 && !isNameValid) return; step < 3 ? setStep(step + 1) : finish() }}>
           {step < 3 ? 'Tuloy' : 'Simulan na!'}
         </Button>
       </div>
