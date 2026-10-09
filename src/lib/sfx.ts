@@ -103,6 +103,11 @@ export const sfx = {
   },
   /** Coin sparkle for chests / quest rewards */
   chest() { [1568, 2093, 2637, 3136].forEach((f, i) => bell(f, i * 0.06, 0.25, 0.08)) },
+  /** Grand celebratory fanfare for world trophy claim */
+  fanfare() {
+    ;[523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => bell(f, i * 0.09, 0.45, 0.14))
+    ;[1568, 2093, 2637].forEach((f, i) => bell(f, 0.45 + i * 0.08, 0.35, 0.1))
+  },
   /** Heart lost */
   heart() { note(587, 0, 0.14, { type: 'triangle', gain: 0.1 }); note(440, 0.12, 0.22, { type: 'triangle', gain: 0.1 }) },
 }
