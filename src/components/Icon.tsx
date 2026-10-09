@@ -271,6 +271,43 @@ const ICONS = {
   sparkle: (
     <path d="M16 3c1 7 3 9 10 10-7 1-9 3-10 10-1-7-3-9-10-10 7-1 9-3 10-10Z" fill={C.sun} />
   ),
+  camera: (
+    <>
+      <path d="M10 9 12 5h8l2 4Z" fill={C.ink} />
+      <rect x="3" y="9" width="26" height="18" rx="4" fill={C.ink} />
+      <circle cx="16" cy="18" r="6.6" fill={C.sky} />
+      <circle cx="16" cy="18" r="3.8" fill={C.skyL} />
+      <circle cx="23.5" cy="13.2" r="1.4" fill={C.sun} />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="5" width="26" height="22" rx="4" fill="#fff" stroke="#E8E2EE" strokeWidth="2" />
+      <circle cx="10.5" cy="12.5" r="2.6" fill={C.sun} />
+      <path d="M5 24 13 15l5 5 4-4.5 8 8.5Z" fill={C.sky} />
+      <path d="M18 20l4-4.5 8 8.5H18Z" fill={C.skyD} opacity=".5" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M6 22 21 7l4 4L10 26Z" fill={C.sun} />
+      <path d="M21 7l4 4-3 3-4-4Z" fill={C.ink} />
+      <path d="M6 22l-1.6 5.6L10 26Z" fill={C.woodD} />
+      <path d="M6 22l2.4 2.4L10 26 4.4 27.6Z" fill="#fff" opacity=".35" />
+    </>
+  ),
+  close: (
+    <>
+      <circle cx="16" cy="16" r="13" fill={C.greyD} opacity=".18" />
+      <path d="M10.5 10.5 21.5 21.5M21.5 10.5 10.5 21.5" stroke={C.ink} strokeWidth="3.4" strokeLinecap="round" />
+    </>
+  ),
+  undo: (
+    <>
+      <path d="M8 10H19a8 8 0 1 1 0 16h-5" fill="none" stroke={C.sky} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.5 5 7 10l5.5 5" fill="none" stroke={C.sky} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
 
   /* ---------- stage icons ---------- */
   pizza: (

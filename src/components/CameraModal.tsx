@@ -24,11 +24,12 @@ const SAMPLES = [
 
 export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
   const [tab, setTab] = useState<ScanTab>('camera')
-  const [scannedLatex, setScannedLatex] = useState('2x + 3 = 11')
+  const [scannedLatex, setScannedLatex] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
+  const [needsConfirm, setNeedsConfirm] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const sketchCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -137,9 +138,10 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
   }
 
   const showSuccessRecognition = () => {
-    // Pick an equation from samples or default
-    const sample = SAMPLES[Math.floor(Math.random() * SAMPLES.length)]
-    setScannedLatex(sample.latex)
+    // On-device OCR isn't reading the frame yet — don't guess a wrong formula.
+    // Leave it blank so the learner confirms the exact expression themselves.
+    setScannedLatex('')
+    setNeedsConfirm(true)
   }
 
   // Handle file upload
@@ -193,7 +195,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
               onClick={onClose}
               className="w-8 h-8 rounded-full bg-cloud flex items-center justify-center text-ink-soft hover:text-ink cursor-pointer"
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           </div>
 
@@ -209,7 +211,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                 tab === 'camera' ? 'border-sky bg-sky text-white shadow-xs' : 'border-line bg-cloud text-ink-soft'
               }`}
             >
-              <span>📸</span> <span>Live Kamera</span>
+              <Icon name="camera" size={16} /> <span>Live Kamera</span>
             </button>
             <button
               type="button"
@@ -221,7 +223,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                 tab === 'upload' ? 'border-sky bg-sky text-white shadow-xs' : 'border-line bg-cloud text-ink-soft'
               }`}
             >
-              <span>🖼️</span> <span>Upload</span>
+              <Icon name="image" size={16} /> <span>Upload</span>
             </button>
             <button
               type="button"
@@ -233,7 +235,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                 tab === 'sketch' ? 'border-sky bg-sky text-white shadow-xs' : 'border-line bg-cloud text-ink-soft'
               }`}
             >
-              <span>✏️</span> <span>Sulat-kamay</span>
+              <Icon name="pencil" size={16} /> <span>Sulat-kamay</span>
             </button>
           </div>
 
@@ -269,7 +271,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                     disabled={isProcessing}
                     className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-sun text-ink font-black text-xs shadow-lg active:scale-95 transition cursor-pointer flex items-center gap-1.5 border-2 border-white"
                   >
-                    <span>📸</span> {isProcessing ? 'Sinisuri…' : 'Kunan at I-scan'}
+                    <Icon name="camera" size={16} /> {isProcessing ? 'Sinisuri…' : 'Kunan at I-scan'}
                   </button>
                 )}
               </div>
@@ -279,8 +281,8 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
             {tab === 'upload' && (
               <label className="rounded-2xl border-2 border-dashed border-sky p-6 flex flex-col items-center justify-center gap-2 bg-sky-soft/20 hover:bg-sky-soft/40 transition cursor-pointer text-center">
                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                <span className="w-12 h-12 rounded-2xl bg-white border-2 border-sky flex items-center justify-center text-xl shadow-xs">
-                  📁
+                <span className="w-12 h-12 rounded-2xl bg-white border-2 border-sky flex items-center justify-center shadow-xs">
+                  <Icon name="image" size={24} />
                 </span>
                 <div>
                   <div className="font-black text-sm text-ink">Pumili ng litrato o screenshot</div>
@@ -310,13 +312,13 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                   <button
                     type="button"
                     onClick={clearSketch}
-                    className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/20 text-white font-black text-[11px] hover:bg-white/30 cursor-pointer"
+                    className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/20 text-white font-black text-[11px] hover:bg-white/30 cursor-pointer flex items-center gap-1"
                   >
-                    Burahin ↺
+                    <Icon name="undo" size={13} white /> Burahin
                   </button>
                 </div>
-                <Button tone="grape" className="w-full text-xs font-black" onClick={processImage}>
-                  {isProcessing ? 'Sinisuri ang sulat-kamay…' : 'I-scan ang Sulat-kamay ✨'}
+                <Button tone="grape" className="w-full text-xs font-black flex items-center justify-center gap-1.5" onClick={processImage}>
+                  {isProcessing ? 'Sinisuri ang sulat-kamay…' : (<><Icon name="sparkle" size={15} white /> I-scan ang Sulat-kamay</>)}
                 </Button>
               </div>
             )}
@@ -324,10 +326,16 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
             {/* Scanned Result Preview & Edit Box */}
             <div className="rounded-2xl border-2 border-line bg-cloud/50 p-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-black uppercase tracking-wider text-ink-soft">Na-detect na Math:</span>
-                <span className="text-[10px] font-black text-leaf bg-leaf-soft px-2 py-0.5 rounded-full border border-leaf/30">
-                  100% Offline OCR
-                </span>
+                <span className="font-black uppercase tracking-wider text-ink-soft">I-verify ang Formula:</span>
+                {scannedLatex ? (
+                  <span className="text-[10px] font-black text-leaf bg-leaf-soft px-2 py-0.5 rounded-full border border-leaf/30">
+                    Handa na
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-black text-sun-dark bg-sun-soft px-2 py-0.5 rounded-full border border-sun/40">
+                    I-type pa
+                  </span>
+                )}
               </div>
 
               {/* Live Rendered LaTeX Math */}
@@ -337,7 +345,9 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                     <Tex tex={scannedLatex} />
                   </span>
                 ) : (
-                  <span className="text-xs font-bold text-ink-soft">Walang na-detect na formula</span>
+                  <span className="text-xs font-bold text-ink-soft">
+                    {needsConfirm ? 'Hindi pa sigurado si Pipo — i-type o piliin sa ibaba ang eksaktong formula' : 'Wala pang formula'}
+                  </span>
                 )}
               </div>
 
@@ -345,7 +355,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
               <input
                 type="text"
                 value={scannedLatex}
-                onChange={(e) => setScannedLatex(e.target.value)}
+                onChange={(e) => { setScannedLatex(e.target.value); setNeedsConfirm(false) }}
                 placeholder="I-edit ang LaTeX kung kailangan…"
                 className="w-full px-3 py-1.5 rounded-xl border border-line bg-white text-xs font-bold text-ink focus:outline-sky"
               />
@@ -361,6 +371,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
                       onClick={() => {
                         sfx.tap()
                         setScannedLatex(s.latex)
+                        setNeedsConfirm(false)
                       }}
                       className="px-2 py-1 rounded-lg bg-white border border-line text-[11px] font-bold text-ink hover:border-sky cursor-pointer"
                     >
@@ -383,7 +394,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
               onClick={handleConfirm}
               className="flex-1 text-xs font-black flex items-center justify-center gap-1.5 shadow-sm"
             >
-              <span>I-solve sa Tutor</span> <span>🚀</span>
+              <span>I-solve sa Tutor</span> <Icon name="bolt" size={16} white />
             </Button>
           </div>
         </motion.div>
