@@ -81,6 +81,10 @@ math-field::part(menu-toggle) { display: none; }
 
 .latex-inline .ML__latex { font-size: 1.15em; }
 
+.key-alt-badge { line-height: 1; }
+.key-alt-badge .latex-inline { display: inline-flex; align-items: flex-start; line-height: 1; }
+.key-alt-badge .ML__latex { font-size: 0.85em !important; line-height: 1 !important; }
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 

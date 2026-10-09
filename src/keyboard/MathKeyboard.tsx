@@ -62,6 +62,9 @@ function Key({ k, onKey }: { k: KeyDef; onKey: (k: KeyDef) => void }) {
   const color =
     k.kind === 'op' ? 'text-sky' : k.kind === 'fn' ? 'text-grape' : k.kind === 'var' ? 'text-ink italic' : 'text-ink'
 
+  const hasAlt = !!k.alt
+  const isComplexMath = k.tex && (k.tex.includes('\\sqrt') || k.tex.includes('\\frac'))
+
   return (
     <button
       type="button"
@@ -69,12 +72,20 @@ function Key({ k, onKey }: { k: KeyDef; onKey: (k: KeyDef) => void }) {
       onPointerUp={() => end(true)}
       onPointerLeave={() => pressed && end(false)}
       onContextMenu={(e) => e.preventDefault()}
-      className={`relative h-[52px] rounded-xl bg-white font-extrabold text-[22px] select-none touch-none flex items-center justify-center
+      className={`relative h-[52px] rounded-xl bg-white font-extrabold select-none touch-none flex items-center justify-center
         shadow-[0_3px_0_#D9D1E3] transition-transform duration-75 ${pressed ? 'translate-y-[3px] shadow-none bg-sky-soft' : ''} ${color}`}
     >
-      <KeyFace k={k} />
+      <div className={`flex items-center justify-center leading-none ${
+        isComplexMath && hasAlt
+          ? 'text-[17px] translate-y-[3.5px] -translate-x-[2.5px]'
+          : hasAlt
+            ? 'text-[19px] translate-y-[2px] -translate-x-[1px]'
+            : 'text-[21px]'
+      }`}>
+        <KeyFace k={k} />
+      </div>
       {k.alt && (
-        <span className="absolute top-0.5 right-1.5 text-[10px] font-bold text-ink-soft/70 pointer-events-none">
+        <span className="key-alt-badge absolute top-1 right-1 pointer-events-none flex items-center justify-end origin-top-right transform scale-[0.48] text-ink-soft/75 select-none">
           <KeyFace k={k.alt} />
         </span>
       )}
