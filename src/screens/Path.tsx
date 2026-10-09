@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { WORLDS, type Stage, type World } from '../curriculum/worlds'
+import { ROADMAP, WORLDS, type SoonWorld, type Stage, type World } from '../curriculum/worlds'
 import { CHEST_GEMS, REFILL_COST, useGame } from '../store/game'
 import { BottomNav, Button, ProgressBar, Sheet, TopStats } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -86,7 +86,7 @@ function ChestNode({ world, id, after, onOpened }: { world: World; id: string; a
     <button
       type="button"
       aria-label="Treasure chest"
-      onClick={() => { if (ready && !opened && openChest(id)) { sfx.complete(); onOpened() } }}
+      onClick={() => { if (ready && !opened && openChest(id)) { sfx.chest(); onOpened() } }}
       className={`relative ${ready && !opened ? 'wiggle' : ''}`}
     >
       <Icon name={opened ? 'chestOpen' : 'chest'} size={64} style={ready ? undefined : { filter: 'grayscale(1)', opacity: 0.5 }} />
@@ -105,6 +105,84 @@ function TrophyNode({ world }: { world: World }) {
       </div>
       <span className={`text-[11px] font-black uppercase tracking-wider ${done ? 'text-sun-dark' : 'text-ink-soft/60'}`}>{done ? 'World complete!' : 'World trophy'}</span>
     </div>
+  )
+}
+
+/** Faint tiled math-symbol pattern tinted with the world colour */
+function patternUrl(color: string) {
+  const glyphs = ['+', '×', '÷', 'π', '√', '=', '%', '∑']
+  const cells = glyphs.map((g, i) => {
+    const x = (i % 4) * 40 + 12 + (Math.floor(i / 4) % 2) * 20
+    const y = Math.floor(i / 4) * 52 + 30
+    const r = (i * 37) % 40 - 20
+    return `<text x="${x}" y="${y}" font-family="Arial Black,Arial" font-weight="900" font-size="22" fill="${color}" fill-opacity="0.09" transform="rotate(${r} ${x} ${y})">${g}</text>`
+  }).join('')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="104">${cells}</svg>`
+  return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`
+}
+
+function worldBackground(color: string, soft: string): React.CSSProperties {
+  return {
+    backgroundColor: soft,
+    backgroundImage: `${patternUrl(color)}, linear-gradient(180deg, ${soft} 0%, #ffffff 92%)`,
+    backgroundSize: '160px 104px, 100% 100%',
+  }
+}
+
+/** Rolling-hill edge at the top of each world */
+function Wave({ color }: { color: string }) {
+  return (
+    <svg className="absolute -top-[22px] left-0 w-full h-6 pointer-events-none" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden>
+      <path d="M0 24 C60 2 120 2 200 14 C280 26 340 4 400 10 V24 Z" fill={color} />
+    </svg>
+  )
+}
+
+/** Decorative scenery along the edges of a world (faded stage icons) */
+function Props({ world, flip }: { world: World; flip: boolean }) {
+  const spots = [
+    { top: 30, side: 'right', size: 38, rot: 12 },
+    { top: 300, side: 'right', size: 46, rot: -10 },
+    { top: 470, side: 'left', size: 40, rot: 8 },
+    { top: 640, side: 'right', size: 36, rot: -14 },
+  ] as const
+  return (
+    <div className="absolute inset-0 pointer-events-none" aria-hidden>
+      {spots.map((s, i) => {
+        const side = flip ? (s.side === 'left' ? 'right' : 'left') : s.side
+        return (
+          <div key={i} className="absolute float" style={{ top: s.top, [side]: 14, opacity: 0.32, transform: `rotate(${s.rot}deg)`, animationDelay: `${i * 0.4}s` }}>
+            <Icon name={world.stages[i % world.stages.length].icon} size={s.size} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SoonSection({ soon }: { soon: SoonWorld }) {
+  return (
+    <section className="relative mt-2 pt-5 pb-8" style={{ background: 'repeating-linear-gradient(135deg, #F7F4FA 0 14px, #F1EDF6 14px 28px)' }}>
+      <Wave color="#F4F0F8" />
+      <div className="mx-4 rounded-2xl border-2 border-dashed border-[#CFC8D6] bg-white/80 p-4">
+        <div className="flex items-center gap-3">
+          <span className="w-12 h-12 rounded-xl bg-cloud flex items-center justify-center shrink-0" style={{ filter: 'grayscale(1)', opacity: 0.6 }}><Icon name={soon.icon} size={32} /></span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-black uppercase tracking-wider text-ink-soft">{soon.level}</div>
+            <div className="text-lg font-black leading-tight text-ink/70">{soon.name}</div>
+          </div>
+          <span className="shrink-0 px-2.5 py-1 rounded-full bg-sun text-ink text-[10px] font-black uppercase tracking-wider shadow-[0_2px_0_var(--color-sun-dark)]">Coming soon</span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {soon.topics.map((t) => (
+            <span key={t} className="px-2.5 py-1 rounded-full bg-cloud border-2 border-line text-[12px] font-bold text-ink-soft flex items-center gap-1">
+              <Icon name="lock" size={12} /> {t}
+            </span>
+          ))}
+        </div>
+        <div className="mt-2 text-[11px] font-bold text-ink-soft">{soon.curriculum}</div>
+      </div>
+    </section>
   )
 }
 
@@ -147,21 +225,18 @@ export function PathScreen() {
           </button>
         </div>
 
-        {WORLDS.map((w, wi) => {
+        {ROADMAP.map((item, ri) => {
+          if (item.kind === 'soon') return <SoonSection key={item.soon.id} soon={item.soon} />
+          const w = item.world
+          const wi = WORLDS.indexOf(w)
           const doneCount = w.stages.filter((st) => completed[st.id]).length
           const items = worldItems(w)
           return (
-            <section key={w.id} ref={(el) => { refs.current[w.id] = el as HTMLDivElement | null }} className="pt-4 pb-4 scroll-mt-2">
-              {wi > 0 && (
-                <div className="flex items-center gap-3 px-6 mb-4">
-                  <div className="flex-1 h-0.5 bg-line" />
-                  <span className="text-xs font-black uppercase tracking-wider text-ink-soft">{w.level}</span>
-                  <div className="flex-1 h-0.5 bg-line" />
-                </div>
-              )}
+            <section key={w.id} ref={(el) => { refs.current[w.id] = el as HTMLDivElement | null }} className="relative pt-5 pb-6 scroll-mt-2 mt-2" style={worldBackground(w.color, w.soft)}>
+              <Wave color={w.soft} />
               <div className="mx-4 rounded-2xl text-white flex items-stretch sticky top-2 z-10 overflow-hidden" style={{ background: w.color, boxShadow: `0 5px 0 ${w.colorDark}` }}>
                 <div className="flex-1 min-w-0 p-3.5 pr-2">
-                  <div className="text-[11px] font-black uppercase tracking-wider opacity-85">World {wi + 1} · {doneCount}/{w.stages.length} stages</div>
+                  <div className="text-[11px] font-black uppercase tracking-wider opacity-85">World {wi + 1} · {w.level} · {doneCount}/{w.stages.length}</div>
                   <div className="text-[19px] font-black leading-tight truncate">{w.name}</div>
                   <div className="text-[11.5px] font-bold opacity-90 truncate">{w.curriculum}</div>
                 </div>
@@ -172,21 +247,22 @@ export function PathScreen() {
               </div>
 
               <div className="relative flex flex-col items-center gap-8 pt-14 pb-4">
+                <Props world={w} flip={ri % 2 === 1} />
                 {items.map((it, i) => (
-                  <div key={i} style={{ transform: `translateX(${offset(i)}px)` }}>
+                  <div key={i} className="relative z-[1]" style={{ transform: `translateX(${offset(i)}px)` }}>
                     {it.kind === 'stage' && <StageNode world={w} stage={it.stage} index={it.index} onOpen={() => setOpen({ world: w, stage: it.stage, index: it.index })} />}
                     {it.kind === 'chest' && <ChestNode world={w} id={it.id} after={it.after} onOpened={() => setToast(`+${CHEST_GEMS} gems!`)} />}
                     {it.kind === 'trophy' && <TrophyNode world={w} />}
                   </div>
                 ))}
-                <Pipo mood={wi % 2 ? 'read' : 'think'} size={92} className={`absolute top-40 ${wi % 2 ? 'right-2' : 'left-2'}`} />
+                <Pipo mood={wi % 2 ? 'read' : 'think'} size={88} className={`absolute top-44 z-[1] ${wi % 2 ? 'right-2' : 'left-2'}`} />
               </div>
             </section>
           )
         })}
-        <div className="flex flex-col items-center gap-2 pb-10 pt-2">
-          <Icon name="lock" size={40} />
-          <span className="text-ink-soft font-bold text-sm">Marami pang worlds ang darating!</span>
+        <div className="flex flex-col items-center gap-2 pb-10 pt-6">
+          <Pipo mood="wave" size={90} />
+          <span className="text-ink-soft font-bold text-sm text-center px-8">Marami pang worlds ang darating! Abangan.</span>
         </div>
       </main>
 

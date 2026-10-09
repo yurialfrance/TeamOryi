@@ -57,7 +57,7 @@ export function QuestsScreen() {
                   <Icon name="chestOpen" size={40} style={{ opacity: 0.6 }} />
                 ) : done ? (
                   <button
-                    onClick={() => { s.claimQuest(q.id, q.gems); sfx.complete(); setJustClaimed(q.id) }}
+                    onClick={() => { s.claimQuest(q.id, q.gems); sfx.chest(); setJustClaimed(q.id) }}
                     className="btn3d bg-sun text-ink px-3 py-2 text-sm flex flex-col items-center wiggle"
                     style={{ ['--shadow' as string]: 'var(--color-sun-dark)' }}
                   >

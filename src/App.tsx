@@ -15,8 +15,9 @@ export default function App() {
   const { screen, stageId, aiEnabled, aiModel, muted } = useGame()
 
   // Auto-load the on-device model if the learner already downloaded it
+  useEffect(() => { setMuted(muted) }, [muted])
+
   useEffect(() => {
-    setMuted(muted)
     if (aiEnabled) isModelCached(aiModel).then((c) => { if (c) loadModel(aiModel) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

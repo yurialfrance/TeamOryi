@@ -71,6 +71,7 @@ export function LessonScreen() {
       if (!missed.has(q.id)) setFirstTry((s) => new Set(s).add(q.id))
     } else {
       sfx.wrong()
+      setTimeout(() => sfx.heart(), 380)
       setPhase('wrong')
       setCombo(0)
       setMissed((s) => new Set(s).add(q.id))

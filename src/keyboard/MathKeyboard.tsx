@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardTab } from '../engine/types'
 import { LAYOUTS, QUICK_CHIPS, type KeyDef } from './layouts'
 import { Tex } from '../lib/math'
-import { haptic } from '../lib/sfx'
+import { haptic, sfx } from '../lib/sfx'
 import { Icon } from '../components/Icon'
 
 interface Props {
@@ -55,6 +55,7 @@ function Key({ k, onKey }: { k: KeyDef; onKey: (k: KeyDef) => void }) {
     timer.current = null
     if (fire && !longFired.current) {
       haptic(8)
+      sfx.key()
       onKey(k)
     }
   }
