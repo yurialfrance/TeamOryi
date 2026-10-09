@@ -11,6 +11,7 @@ import { baseMessages, stream, useAi, type AiLang, type ChatMsg } from '../ai/ll
 import { extractMath, solveLatex, verifyAiMath, type CalcResult } from '../engine/solver'
 import { DISAGREE, isGrounded, recheckReply, stepLabel, templateExplain } from '../ai/guard'
 import { AiSetupCard } from './AiSetup'
+import { CameraModal } from '../components/CameraModal'
 
 type Source = 'ai' | 'verified' | 'recheck'
 interface Msg { role: 'user' | 'assistant'; text: string; latex?: string; calc?: CalcResult; fixed?: number; done?: boolean; aiError?: string; source?: Source }
@@ -87,6 +88,7 @@ export function TutorScreen() {
   const { level, history, go, aiLang, set, pushHistory } = useGame()
   const L = T[aiLang]
   const [showKb, setShowKb] = useState(true)
+  const [cameraOpen, setCameraOpen] = useState(false)
   const ai = useAi()
   const ready = ai.status === 'ready'
   const world = WORLDS.find((w) => w.id === level) ?? WORLDS[0]
@@ -179,6 +181,14 @@ export function TutorScreen() {
           <div className="font-black text-lg leading-tight">{L.title}</div>
           <OfflineBadge ready={ready} />
         </div>
+        <button
+          type="button"
+          onClick={() => setCameraOpen(true)}
+          aria-label="Kamera ni Pipo"
+          className="h-10 px-2.5 rounded-xl border-2 border-sun bg-sun-soft text-ink flex items-center gap-1.5 text-xs font-black hover:brightness-105 active:scale-95 transition cursor-pointer"
+        >
+          <span className="text-sm">📸</span> Kamera
+        </button>
         <button onClick={() => setShowKb((v) => !v)} aria-label="Math keyboard"
           className={`h-10 px-2.5 rounded-xl border-2 flex items-center gap-1 text-xs font-black ${showKb ? 'border-sky bg-sky-soft text-sky' : 'border-line text-ink-soft'}`}>
           <Icon name="abacus" size={22} /> {L.keys}
@@ -255,6 +265,15 @@ export function TutorScreen() {
           onChip={(c) => setText((t) => (t ? t + ' ' : '') + c)}
         />
       )}
+
+      <CameraModal
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(scanned) => {
+          setLatex(scanned)
+          mf.current?.set(scanned)
+        }}
+      />
     </div>
   )
 }
