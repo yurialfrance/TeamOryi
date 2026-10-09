@@ -4,7 +4,7 @@ import { Icon, type IconName } from './Icon'
 import { WORLDS } from '../curriculum/worlds'
 import { dailyQuests, isClaimed } from '../store/quests'
 
-type Tone = 'sky' | 'leaf' | 'heart' | 'sun' | 'white' | 'grape' | 'ghost'
+type Tone = 'sky' | 'leaf' | 'heart' | 'sun' | 'white' | 'grape' | 'ghost' | 'pig'
 
 const TONES: Record<Tone, { cls: string; shadow: string }> = {
   sky: { cls: 'bg-sky text-white', shadow: 'var(--color-sky-dark)' },
@@ -12,6 +12,7 @@ const TONES: Record<Tone, { cls: string; shadow: string }> = {
   heart: { cls: 'bg-heart text-white', shadow: 'var(--color-heart-dark)' },
   sun: { cls: 'bg-sun text-ink', shadow: 'var(--color-sun-dark)' },
   grape: { cls: 'bg-grape text-white', shadow: 'var(--color-grape-dark)' },
+  pig: { cls: 'bg-pig text-white', shadow: 'var(--color-pig-dark)' },
   white: { cls: 'bg-white text-sky border-2 border-line', shadow: '#E0D9E8' },
   ghost: { cls: 'bg-transparent text-sky', shadow: 'transparent' },
 }
@@ -44,7 +45,7 @@ export function TopStats() {
   const world = WORLDS.find((w) => w.id === level)!
   return (
     <div className="flex items-center justify-between w-full">
-      <button onClick={() => go('profile')} className="w-10 h-9 rounded-xl border-2 border-line flex items-center justify-center" style={{ background: world.soft }} aria-label="Level">
+      <button onClick={() => go('profile')} className="w-10 h-9 rounded-xl border-2 border-[#FFD0DE] flex items-center justify-center hover:scale-105 active:scale-95 transition" style={{ background: world.soft }} aria-label="Level">
         <Icon name={world.icon} size={24} />
       </button>
       <Stat icon="flame" value={streak} color={activeToday ? '#FF8A1F' : '#B7AEC0'} dim={!activeToday} />
@@ -66,16 +67,16 @@ export function BottomNav() {
     { id: 'profile', icon: 'medal', label: 'Ako' },
   ]
   return (
-    <nav className="border-t-2 border-line bg-white grid grid-cols-5 safe-bottom px-1">
+    <nav className="border-t-2 border-[#F6DCE4] bg-white/95 backdrop-blur-sm grid grid-cols-5 safe-bottom px-1 shadow-[0_-4px_16px_rgba(255,143,177,.08)]">
       {items.map((it) => {
         const on = screen === it.id
         return (
-          <button key={it.id} type="button" onClick={() => go(it.id)} className="py-1.5 flex flex-col items-center gap-0.5 relative">
-            <span className={`w-12 h-11 flex items-center justify-center rounded-2xl border-2 transition-colors ${on ? 'bg-sky-soft border-sky' : 'border-transparent'}`}>
+          <button key={it.id} type="button" onClick={() => go(it.id)} className="py-1.5 flex flex-col items-center gap-0.5 relative group">
+            <span className={`w-12 h-11 flex items-center justify-center rounded-2xl border-2 transition-all ${on ? 'bg-[#FFE9F0] border-[#FF8FB1] shadow-sm scale-105' : 'border-transparent group-hover:bg-[#FFF5F8]'}`}>
               <Icon name={it.icon} size={30} style={on ? undefined : { filter: 'saturate(.75)' }} />
             </span>
-            {it.id === 'quests' && questsReady && <span className="absolute top-1 right-4 w-3 h-3 rounded-full bg-heart border-2 border-white" />}
-            <span className={`text-[10px] font-black uppercase tracking-wider ${on ? 'text-sky' : 'text-ink-soft'}`}>{it.label}</span>
+            {it.id === 'quests' && questsReady && <span className="absolute top-1 right-4 w-3 h-3 rounded-full bg-heart border-2 border-white animate-pulse" />}
+            <span className={`text-[10px] font-black uppercase tracking-wider transition-colors ${on ? 'text-pig-dark font-black' : 'text-ink-soft'}`}>{it.label}</span>
           </button>
         )
       })}

@@ -183,7 +183,13 @@ export function PathScreen() {
               {guide.guide.map((g, i) => (
                 <div key={i} className="rounded-2xl border-2 border-line p-4">
                   <div className="font-black mb-1" style={{ color: guide.colorDark }}>{g.title}</div>
-                  {g.tex && <div className="text-2xl my-2 text-center"><Tex tex={g.tex} /></div>}
+                  {g.tex && (
+                    <div className="w-full overflow-x-auto no-scrollbar my-2 px-1 flex justify-center items-center">
+                      <div className="text-xl sm:text-2xl font-bold text-center inline-block max-w-full">
+                        <Tex tex={g.tex} />
+                      </div>
+                    </div>
+                  )}
                   <div className="font-semibold text-ink-soft text-[15px]">{g.text}</div>
                 </div>
               ))}

@@ -38,7 +38,7 @@ export function LearnScreen() {
   const back = () => { sfx.tap(); if (step === 0) go('path'); else setStep((s) => s - 1) }
   const skip = () => { sfx.tap(); startLesson(stage.id) }
 
-  const mood: Mood = onReady ? 'determined' : step === items.length - 1 ? 'eureka' : step === 0 ? 'point' : 'think'
+  const mood: Mood = onReady ? 'star' : step === items.length - 1 ? 'eureka' : step === 0 ? 'point' : 'think'
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -55,21 +55,27 @@ export function LearnScreen() {
         <div className="flex items-end gap-3 mb-6">
           <Pipo mood={mood} size={110} className="bob shrink-0" />
           <motion.div key={'bubble' + step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="relative mb-2 rounded-2xl border-2 border-line bg-white px-4 py-3 font-bold text-[16px] leading-snug flex-1">
+            className="relative mb-2 rounded-2xl border-2 border-[#FFC2D4] bg-[#FFF8FA] px-4 py-3 font-bold text-[16px] leading-snug flex-1 shadow-sm">
             {onReady ? `Ready ka na ba${name ? `, ${name}` : ''}? Alam mo na ang basics — subukan na natin!` : items[step].text}
-            <span className="absolute -left-2 bottom-4 w-4 h-4 rotate-45 bg-white border-l-2 border-b-2 border-line" />
+            <span className="absolute -left-2 bottom-4 w-4 h-4 rotate-45 bg-[#FFF8FA] border-l-2 border-b-2 border-[#FFC2D4]" />
           </motion.div>
         </div>
 
         <AnimatePresence mode="wait">
           <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}>
             {!onReady ? (
-              <div className="rounded-2xl border-2 border-line p-4 space-y-3" style={{ background: world.soft }}>
+              <div className="rounded-2xl border-2 border-line p-4 sm:p-5 space-y-3 overflow-hidden shadow-sm" style={{ background: world.soft }}>
                 <div className="font-black text-lg text-center" style={{ color: world.colorDark }}>{items[step].title}</div>
                 {step === 0 && WORLD_VISUAL[world.id] && (
                   <div className="flex justify-center py-1"><VisualView v={WORLD_VISUAL[world.id]!} /></div>
                 )}
-                {items[step].tex && <div className="text-3xl text-center py-2"><Tex tex={items[step].tex} /></div>}
+                {items[step].tex && (
+                  <div className="w-full overflow-x-auto no-scrollbar py-2 px-1 flex justify-center items-center">
+                    <div className="text-2xl sm:text-3xl font-bold text-center inline-block max-w-full">
+                      <Tex tex={items[step].tex} />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border-2 border-line p-5 text-center" style={{ background: world.soft }}>

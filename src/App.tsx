@@ -29,8 +29,8 @@ export default function App() {
   if (import.meta.env.DEV && location.search.includes('icons')) return <IconGallery />
 
   return (
-    <div className="h-full w-full flex justify-center bg-[#EDE8F3]">
-      <div className="relative h-full w-full max-w-[480px] bg-white shadow-[0_0_40px_rgba(60,51,70,.12)] overflow-hidden">
+    <div className="h-full w-full flex justify-center bg-[#FDECEF]">
+      <div className="relative h-full w-full max-w-[480px] bg-white shadow-[0_0_40px_rgba(255,143,177,.18)] overflow-hidden">
         {screen === 'onboarding' && <Onboarding />}
         {screen === 'path' && <PathScreen />}
         {screen === 'learn' && stageId && <LearnScreen key={stageId} />}

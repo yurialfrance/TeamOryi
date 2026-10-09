@@ -10,13 +10,13 @@
   --color-ink-soft: #7A6F85;
   --color-line: #E8E2EE;
   --color-paper: #FFFFFF;
-  --color-cloud: #F7F4FA;
+  --color-cloud: #FFF6F8;     /* Soft warm pig blush background */
 
   --color-sky: #2F6BFF;      /* primary — flag blue */
   --color-sky-dark: #1F4FD1;
   --color-sky-soft: #E6EEFF;
 
-  --color-sun: #FFC83D;      /* XP / gold */
+  --color-sun: #FFC83D;      /* XP / gold star */
   --color-sun-dark: #E5A800;
   --color-sun-soft: #FFF6DA;
 
@@ -28,9 +28,10 @@
   --color-leaf-dark: #2A9A51;
   --color-leaf-soft: #E3F8EA;
 
-  --color-pig: #FF8FB1;      /* Pipo pink */
-  --color-pig-dark: #E46A92;
-  --color-pig-soft: #FFE9F0;
+  --color-pig: #FF8FB1;      /* Pipo rosy pink */
+  --color-pig-dark: #E0678F;
+  --color-pig-soft: #FFF0F4;
+  --color-pig-accent: #FFC2D4;
 
   --color-flame: #FF8A1F;
   --color-grape: #9B5DE5;
@@ -79,7 +80,15 @@ math-field:focus-within { border-color: var(--color-sky); }
 math-field::part(virtual-keyboard-toggle),
 math-field::part(menu-toggle) { display: none; }
 
-.latex-inline .ML__latex { font-size: 1.15em; }
+.latex-inline {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.latex-inline .ML__latex {
+  font-size: 1.15em;
+  max-width: 100%;
+}
 
 .key-alt-badge { line-height: 1; }
 .key-alt-badge .latex-inline { display: inline-flex; align-items: flex-start; line-height: 1; }
