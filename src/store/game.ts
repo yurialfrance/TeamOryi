@@ -54,6 +54,7 @@ interface Persisted {
   todayPerfect: number
   claimed: Record<string, string> // questId → date claimed
   openedChests: string[]
+  claimedTrophies: string[]
   perfectCount: number
   lessonsDone: number
   duelWins: number
@@ -81,6 +82,7 @@ interface Actions {
   refillHearts: () => void
   finishLesson: (r: Omit<LessonResult, 'streakUp'>) => void
   openChest: (id: string) => boolean
+  claimTrophy: (worldId: string, gems?: number) => boolean
   claimQuest: (id: string, gems: number) => void
   buyRefill: () => boolean
   pushHistory: (latex: string) => void
@@ -113,6 +115,7 @@ const initial: Persisted = {
   todayPerfect: 0,
   claimed: {},
   openedChests: [],
+  claimedTrophies: [],
   perfectCount: 0,
   lessonsDone: 0,
   duelWins: 0,
@@ -191,6 +194,13 @@ export const useGame = create<Persisted & Volatile & Actions>()(
         set({ openedChests: [...s.openedChests, id], gems: s.gems + CHEST_GEMS })
         return true
       },
+      claimTrophy: (worldId, gems = 50) => {
+        const s = get()
+        const claimed = s.claimedTrophies ?? []
+        if (claimed.includes(worldId)) return false
+        set({ claimedTrophies: [...claimed, worldId], gems: s.gems + gems })
+        return true
+      },
       claimQuest: (id, gems) => set((s) => ({ claimed: { ...s.claimed, [id]: today() }, gems: s.gems + gems })),
       buyRefill: () => {
         const s = get()
@@ -225,6 +235,7 @@ export const useGame = create<Persisted & Volatile & Actions>()(
         }
         if (state.lastLessonDate && state.lastLessonDate !== today() && state.lastLessonDate !== yesterday()) state.streak = 0
         if ((state.aiLang as string) === 'filipino') state.aiLang = 'taglish'
+        state.claimedTrophies ??= []
         state.screen = state.onboarded ? 'path' : 'onboarding'
       },
     },

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
+import confetti from 'canvas-confetti'
 import { ROADMAP, WORLDS, type Stage, type World } from '../curriculum/worlds'
 import { CHEST_GEMS, REFILL_COST, useGame } from '../store/game'
 import { BottomNav, Button, ProgressBar, Sheet, TopStats } from '../components/ui'
@@ -16,6 +17,7 @@ export function PathScreen() {
   const [open, setOpen] = useState<{ world: World; stage: Stage; index: number } | null>(null)
   const [guide, setGuide] = useState<World | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [trophyClaimedWorld, setTrophyClaimedWorld] = useState<World | null>(null)
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
   const quests = dailyQuests(s)
   const questsDone = quests.filter((q) => q.progress(s) >= q.target).length
@@ -98,6 +100,11 @@ export function PathScreen() {
                       flip={ri % 2 === 1}
                       onOpenStage={(st, i) => setOpen({ world: w, stage: st, index: i })}
                       onChest={() => setToast(`+${CHEST_GEMS} gems!`)}
+                      onTrophyClaim={(claimedWorld) => {
+                        confetti({ particleCount: 90, spread: 80, origin: { y: 0.4 } })
+                        setToast('+50 gems!')
+                        setTrophyClaimedWorld(claimedWorld)
+                      }}
                     />
                   </motion.div>
                 )}
@@ -181,6 +188,29 @@ export function PathScreen() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </Sheet>
+
+      {/* Trophy Reward Claim Modal */}
+      <Sheet open={!!trophyClaimedWorld} onClose={() => setTrophyClaimedWorld(null)} bg={trophyClaimedWorld?.color}>
+        {trophyClaimedWorld && (
+          <div className="text-white text-center flex flex-col items-center">
+            <motion.div initial={{ scale: 0.5, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', damping: 12 }}>
+              <Pipo mood="trophy" size={130} />
+            </motion.div>
+            <div className="text-xs font-black uppercase tracking-wider opacity-90 mt-2">World Completed! · {trophyClaimedWorld.level}</div>
+            <div className="text-2xl font-black mt-1 leading-tight">{trophyClaimedWorld.name}</div>
+            <p className="text-sm font-semibold opacity-90 mt-2 px-3">
+              Magaling! Nakumpleto mo ang lahat ng mga aralin sa mundong ito at nakuha mo ang iyong gintong tropeo!
+            </p>
+            <div className="my-4 px-5 py-2.5 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center gap-2 border-2 border-white/30">
+              <Icon name="gem" size={28} />
+              <span className="text-xl font-black">+50 Premyong Gems!</span>
+            </div>
+            <Button tone="white" className="w-full text-ink font-black mt-2" onClick={() => setTrophyClaimedWorld(null)}>
+              Kahanga-hanga! Ipagpatuloy
+            </Button>
           </div>
         )}
       </Sheet>

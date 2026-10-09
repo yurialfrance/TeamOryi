@@ -91,13 +91,6 @@ function StageNode({ world, stage, index, onOpen, flip }: { world: World; stage:
   const p = POS.s[index]
   return (
     <div className="absolute -translate-x-1/2 -translate-y-1/2 z-[2]" style={{ left: pct(p.x, flip), top: p.y }}>
-      {current && (
-        <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 1.6 }}
-          className="absolute left-1/2 -translate-x-1/2 -top-[64px] w-[54px] h-[54px] rounded-full bg-white border-[3px] flex items-center justify-center overflow-hidden shadow-[0_4px_0_rgba(0,0,0,.15)]"
-          style={{ borderColor: world.color }}>
-          <Pipo mood="backpack" size={50} />
-        </motion.div>
-      )}
       {current && <span className="absolute inset-[-8px] rounded-full pulse-ring pointer-events-none" />}
       {done && <Flag color={world.color} />}
       <button
@@ -112,8 +105,28 @@ function StageNode({ world, stage, index, onOpen, flip }: { world: World; stage:
           border: current ? `3px solid ${world.color}` : 'none',
         }}
       >
-        <span className="absolute top-1.5 left-3 w-5 h-2 rounded-full bg-white/80 -rotate-12" />
-        {unlocked ? index + 1 : <Icon name="lock" size={26} />}
+        <span className="absolute top-1.5 left-3 w-5 h-2 rounded-full bg-white/80 -rotate-12 pointer-events-none" />
+        {current ? (
+          <motion.div
+            animate={{ y: [0, -3, 0] }}
+            transition={{ repeat: Infinity, duration: 1.6 }}
+            className="w-full h-full flex items-center justify-center overflow-hidden rounded-[50%]"
+          >
+            <Pipo mood="backpack" size={46} />
+          </motion.div>
+        ) : unlocked ? (
+          index + 1
+        ) : (
+          <Icon name="lock" size={26} />
+        )}
+        {current && (
+          <span
+            className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full text-white font-black text-xs flex items-center justify-center shadow-md border-2 border-white pointer-events-none"
+            style={{ background: world.color }}
+          >
+            {index + 1}
+          </span>
+        )}
       </button>
       {done && (
         <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 flex gap-px">
@@ -145,17 +158,57 @@ function ChestTile({ world, onOpened, flip }: { world: World; onOpened: () => vo
   )
 }
 
-function TrophyIslet({ world, flip }: { world: World; flip: boolean }) {
-  const { completed } = useGame()
+function TrophyIslet({ world, flip, onClaim }: { world: World; flip: boolean; onClaim?: () => void }) {
+  const { completed, claimedTrophies, claimTrophy } = useGame()
   const done = world.stages.every((s) => completed[s.id])
+  const claimed = (claimedTrophies ?? []).includes(world.id)
+
+  const handleClaim = () => {
+    if (!done) return
+    if (!claimed) {
+      if (claimTrophy(world.id, 50)) {
+        sfx.fanfare()
+        onClaim?.()
+      }
+    } else {
+      sfx.tap()
+      onClaim?.()
+    }
+  }
+
   return (
     <div className="absolute -translate-x-1/2 -translate-y-1/2 z-[2] flex flex-col items-center" style={{ left: pct(POS.trophy.x, flip), top: POS.trophy.y }}>
-      <div className={done ? 'float' : ''}>
-        <Icon name="trophy" size={58} style={done ? undefined : { filter: 'grayscale(1)', opacity: 0.55 }} />
-      </div>
-      <span className={`mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${done ? 'bg-sun text-ink' : 'bg-white/60 text-ink-soft'}`}>
-        {done ? 'Tapos!' : 'Trophy'}
-      </span>
+      <button
+        type="button"
+        disabled={!done}
+        onClick={handleClaim}
+        aria-label={done ? (claimed ? 'Trophy Nakuha na' : 'Kolektahin ang Premyo (+50 Gems)') : 'Trophy naka-lock'}
+        className={`relative flex flex-col items-center transition-transform ${done ? 'active:scale-95 cursor-pointer' : 'cursor-default'}`}
+      >
+        <div className={done ? (claimed ? 'float' : 'wiggle') : ''}>
+          <Icon name="trophy" size={58} style={done ? undefined : { filter: 'grayscale(1)', opacity: 0.55 }} />
+        </div>
+        {done && !claimed && (
+          <motion.span
+            animate={{ scale: [1, 1.15, 1] }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            className="absolute -top-3.5 -right-3 px-2 py-0.5 rounded-full bg-flame text-white text-[11px] font-black uppercase shadow-md flex items-center gap-0.5"
+          >
+            +50 <Icon name="gem" size={12} />
+          </motion.span>
+        )}
+        <span
+          className={`mt-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm transition-all ${
+            !done
+              ? 'bg-white/60 text-ink-soft'
+              : claimed
+              ? 'bg-white text-ink border border-line'
+              : 'bg-sun text-ink ring-2 ring-sun/50 pulse-ring'
+          }`}
+        >
+          {done ? (claimed ? 'Tapos! ✓' : 'Kolektahin! 💎') : 'Trophy'}
+        </span>
+      </button>
     </div>
   )
 }
@@ -233,7 +286,19 @@ export function WorldCard({
   )
 }
 
-export function Island({ world, flip, onOpenStage, onChest }: { world: World; flip: boolean; onOpenStage: (s: Stage, i: number) => void; onChest: () => void }) {
+export function Island({
+  world,
+  flip,
+  onOpenStage,
+  onChest,
+  onTrophyClaim,
+}: {
+  world: World
+  flip: boolean
+  onOpenStage: (s: Stage, i: number) => void
+  onChest: () => void
+  onTrophyClaim?: (world: World) => void
+}) {
   return (
     <div className="relative mx-3 -mt-5" style={{ height: H + 40 }}>
       {/* main island body with cliff side */}
@@ -247,7 +312,7 @@ export function Island({ world, flip, onOpenStage, onChest }: { world: World; fl
       <Tree x={pct(38, flip)} y={300} s={0.9} /><Tree x={pct(70, flip)} y={20} s={0.9} /><Tree x={pct(78, flip)} y={36} s={0.75} />
       <House x={pct(flip ? 88 : 70, flip)} y={340} />
       <Pond x={pct(flip ? 56 : 34, flip)} y={92} />
-      <TrophyIslet world={world} flip={flip} />
+      <TrophyIslet world={world} flip={flip} onClaim={() => onTrophyClaim?.(world)} />
       <ChestTile world={world} onOpened={onChest} flip={flip} />
       {world.stages.map((s, i) => <StageNode key={s.id} world={world} stage={s} index={i} flip={flip} onOpen={() => onOpenStage(s, i)} />)}
     </div>
