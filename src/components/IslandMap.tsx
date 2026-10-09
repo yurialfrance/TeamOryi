@@ -170,23 +170,62 @@ function StarRow({ value, max = 5 }: { value: number; max?: number }) {
 }
 
 /** Glassy summary card, like a "综合评价" score card */
-export function WorldCard({ world, index, onGuide }: { world: World; index: number; onGuide: () => void }) {
+export function WorldCard({
+  world,
+  index,
+  isOpen = false,
+  onToggle,
+  onGuide,
+}: {
+  world: World
+  index: number
+  isOpen?: boolean
+  onToggle?: () => void
+  onGuide: () => void
+}) {
   const { completed } = useGame()
   const done = world.stages.filter((s) => completed[s.id]).length
   const stars = world.stages.reduce((a, s) => a + (completed[s.id]?.stars ?? 0), 0)
   return (
-    <div className="relative mx-4 rounded-[22px] bg-white/95 border-[3px] border-[#DCE4FF] shadow-[0_8px_24px_rgba(40,30,120,.25)] p-3 pr-2 flex gap-3 z-[3]">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle?.() } }}
+      className={`relative mx-4 rounded-[22px] bg-white/95 border-[3px] shadow-[0_8px_24px_rgba(40,30,120,.25)] p-3 pr-2 flex gap-3 z-[3] cursor-pointer transition-all active:scale-[0.99] select-none ${
+        isOpen ? 'border-sky shadow-[0_10px_28px_rgba(47,107,255,.35)] ring-2 ring-sky/30' : 'border-[#DCE4FF] hover:border-sky/60'
+      }`}
+    >
       <div className="flex-1 min-w-0">
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-white text-[11px] font-black uppercase tracking-wide" style={{ background: world.color }}>
-          <Icon name={world.icon} size={14} white /> World {index + 1} · {world.level}
-        </span>
+        <div className="flex items-center justify-between gap-1">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-white text-[11px] font-black uppercase tracking-wide" style={{ background: world.color }}>
+            <Icon name={world.icon} size={14} white /> World {index + 1} · {world.level}
+          </span>
+          <span
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-200 shrink-0 ${
+              isOpen ? 'rotate-180 bg-sky-soft text-sky' : 'bg-cloud text-ink-soft'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden>
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </div>
         <div className="text-[18px] font-black leading-tight mt-1 truncate">{world.name}</div>
         <div className="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-[12px] font-bold text-ink-soft">
           <span>Stages</span><StarRow value={done} />
           <span>Galing</span><StarRow value={Math.round((stars / (world.stages.length * 3)) * 5)} />
         </div>
       </div>
-      <button onClick={onGuide} className="shrink-0 w-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 active:translate-y-0.5" style={{ borderColor: world.soft, background: world.soft }}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onGuide()
+        }}
+        className="shrink-0 w-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 active:translate-y-0.5 hover:brightness-95 transition"
+        style={{ borderColor: world.soft, background: world.soft }}
+      >
         <Icon name="book" size={30} />
         <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: world.colorDark }}>Gabay</span>
       </button>

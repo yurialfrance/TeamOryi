@@ -12,6 +12,7 @@ import { Island, SKY, SoonIsland, WorldCard } from '../components/IslandMap'
 export function PathScreen() {
   const s = useGame()
   const { level, todayXp, dailyGoal, startLesson, isUnlocked, completed, hearts, gems, buyRefill, go } = s
+  const [selectedWorldId, setSelectedWorldId] = useState<string | null>(level || 'primary')
   const [open, setOpen] = useState<{ world: World; stage: Stage; index: number } | null>(null)
   const [guide, setGuide] = useState<World | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -20,8 +21,29 @@ export function PathScreen() {
   const questsDone = quests.filter((q) => q.progress(s) >= q.target).length
   const claimable = quests.some((q) => q.progress(s) >= q.target && !isClaimed(s, q.id))
 
-  useEffect(() => { refs.current[level]?.scrollIntoView({ block: 'start' }) }, [level])
+  const prevLevelRef = useRef(level)
+  useEffect(() => {
+    if (level !== prevLevelRef.current) {
+      prevLevelRef.current = level
+      setSelectedWorldId(level)
+    }
+  }, [level])
+
+  useEffect(() => {
+    if (selectedWorldId) {
+      refs.current[selectedWorldId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedWorldId])
+
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 1800); return () => clearTimeout(t) } }, [toast])
+
+  const handleToggleWorld = (worldId: string) => {
+    setSelectedWorldId((curr) => {
+      const next = curr === worldId ? null : worldId
+      if (next) s.set({ level: worldId })
+      return next
+    })
+  }
 
   return (
     <div className="h-full flex flex-col bg-white relative">
@@ -52,10 +74,34 @@ export function PathScreen() {
           if (item.kind === 'soon') return <SoonIsland key={item.soon.id} soon={item.soon} />
           const w = item.world
           const wi = WORLDS.indexOf(w)
+          const isOpen = selectedWorldId === w.id
           return (
-            <section key={w.id} ref={(el) => { refs.current[w.id] = el as HTMLDivElement | null }} className="relative pt-6 scroll-mt-2">
-              <WorldCard world={w} index={wi} onGuide={() => setGuide(w)} />
-              <Island world={w} flip={ri % 2 === 1} onOpenStage={(st, i) => setOpen({ world: w, stage: st, index: i })} onChest={() => setToast(`+${CHEST_GEMS} gems!`)} />
+            <section key={w.id} ref={(el) => { refs.current[w.id] = el as HTMLDivElement | null }} className="relative pt-4 scroll-mt-2">
+              <WorldCard
+                world={w}
+                index={wi}
+                isOpen={isOpen}
+                onToggle={() => handleToggleWorld(w.id)}
+                onGuide={() => setGuide(w)}
+              />
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    className="overflow-hidden pb-4"
+                  >
+                    <Island
+                      world={w}
+                      flip={ri % 2 === 1}
+                      onOpenStage={(st, i) => setOpen({ world: w, stage: st, index: i })}
+                      onChest={() => setToast(`+${CHEST_GEMS} gems!`)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </section>
           )
         })}
