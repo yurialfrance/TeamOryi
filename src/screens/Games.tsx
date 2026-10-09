@@ -20,7 +20,7 @@ export function GamesScreen() {
         <p className="text-ink-soft font-semibold text-[15px] mb-5">Mini-laro para mas masaya ang pag-aaral ng math.</p>
 
         <button onClick={() => go('duel')}
-          className="w-full rounded-2xl p-4 flex items-center gap-3 text-left shadow-[0_4px_0_rgba(40,30,120,.25)] active:translate-y-0.5"
+          className="w-full rounded-2xl p-4 flex items-center gap-3 text-left shadow-[0_4px_0_rgba(40,30,120,.25)] active:translate-y-0.5 cursor-pointer transition hover:brightness-105"
           style={{ background: 'linear-gradient(135deg,#2F6BFF,#9B5DE5)' }}>
           <span className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0"><Icon name="versus" size={34} white /></span>
           <div className="flex-1 min-w-0">
@@ -29,6 +29,28 @@ export function GamesScreen() {
             {duelsPlayed > 0 && <div className="text-white/70 text-[11px] font-bold mt-1">{duelWins}/{duelsPlayed} panalo</div>}
           </div>
           <Icon name="bolt" size={24} white />
+        </button>
+
+        {/* The Sari-Sari Store Cashier Simulator */}
+        <button onClick={() => go('cashier')}
+          className="w-full rounded-2xl p-4 mt-3 flex items-center gap-3 text-left shadow-[0_4px_0_rgba(180,60,20,.35)] active:translate-y-0.5 cursor-pointer transition hover:brightness-105"
+          style={{ background: 'linear-gradient(135deg,#FF8A1F,#D93355)' }}>
+          <span className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+            <Icon name="store" size={34} white />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-white font-black text-lg leading-tight">Sari-Sari Store Cashier</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-sun text-ink shadow-xs">Bago!</span>
+            </div>
+            <div className="text-white/95 text-xs font-bold mt-0.5 leading-snug">
+              Tindahan ni Aling Nena · Drag-and-drop coins & bills para sa whole numbers, sukli, at decimals
+            </div>
+            <div className="text-white/80 text-[11px] font-bold mt-1">
+              May 3 antas: Tingi-tingi, Sukli Master, at Sentimo
+            </div>
+          </div>
+          <span className="text-white text-xl font-black shrink-0">→</span>
         </button>
 
         <div className="rounded-2xl border-2 border-dashed border-line p-4 mt-4 flex items-center gap-3 opacity-70">

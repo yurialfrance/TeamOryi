@@ -11,7 +11,7 @@ const yesterday = () => {
   return d.toLocaleDateString('en-CA')
 }
 
-export type Screen = 'onboarding' | 'path' | 'learn' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests' | 'games' | 'duel'
+export type Screen = 'onboarding' | 'path' | 'learn' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests' | 'games' | 'duel' | 'cashier'
 
 export const REFILL_COST = 30
 export const CHEST_GEMS = 20
