@@ -19,6 +19,7 @@ import { sfx } from '../lib/sfx'
 import { hintMessages, stream, useAi, whyWrongMessages } from '../ai/llm'
 import { diagnoseMisconception, type MisconceptionReport } from '../engine/diagnostics'
 import { speakText, stopSpeaking } from '../lib/tts'
+import { Scratchpad } from '../components/Scratchpad'
 
 const PRAISE = ['Ang galing mo!', 'Tumpak!', 'Lodi!', 'Sakto!', 'Petmalu!', 'Galing-galing!']
 const COMFORT = ['Okay lang, matututo tayo!', 'Muntik na!', 'Next time makukuha mo na!']
@@ -52,6 +53,7 @@ export function LessonScreen() {
   const [bestCombo, setBestCombo] = useState(0)
   const [diagnostic, setDiagnostic] = useState<MisconceptionReport | null>(null)
   const [speakingTarget, setSpeakingTarget] = useState<'why' | 'hint' | 'diag' | null>(null)
+  const [scratchpadOpen, setScratchpadOpen] = useState(false)
   const start = useRef(Date.now())
   const mf = useRef<MathFieldHandle>(null)
   const aiReady = useAi((s) => s.status === 'ready')
@@ -239,10 +241,27 @@ export function LessonScreen() {
             {nudge && <div className="mt-3 rounded-xl bg-sun-soft text-ink font-bold px-3 py-2 text-[15px] flex items-center gap-2"><Icon name="bulb" size={22} /> {nudge}</div>}
 
             {phase === 'answer' && (
-              <button onClick={askHint} className="btn3d mt-4 inline-flex items-center gap-2 pl-2 pr-3 py-1.5 border-2 border-line bg-white font-black text-grape text-sm" style={{ ['--shadow' as string]: '#E0D9E8' }}>
-                <Icon name="bulb" size={22} /> {hintNo === 0 ? 'Hint kay Pipo' : 'Isa pang hint'} {aiReady && <span className="text-[10px] px-1.5 py-0.5 rounded bg-leaf-soft text-leaf-dark">AI</span>}
-              </button>
+              <div className="flex items-center gap-2 mt-4 flex-wrap">
+                <button onClick={askHint} className="btn3d inline-flex items-center gap-2 pl-2 pr-3 py-1.5 border-2 border-line bg-white font-black text-grape text-sm" style={{ ['--shadow' as string]: '#E0D9E8' }}>
+                  <Icon name="bulb" size={22} /> {hintNo === 0 ? 'Hint kay Pipo' : 'Isa pang hint'} {aiReady && <span className="text-[10px] px-1.5 py-0.5 rounded bg-leaf-soft text-leaf-dark">AI</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScratchpadOpen((o) => !o)}
+                  className={`btn3d inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 border-2 font-black text-sm transition-all ${
+                    scratchpadOpen ? 'bg-sky-soft border-sky text-sky-dark' : 'bg-white border-line text-ink'
+                  }`}
+                  style={{ ['--shadow' as string]: scratchpadOpen ? 'var(--color-sky)' : '#E0D9E8' }}
+                >
+                  <span className="text-base">✏️</span>
+                  <span>{scratchpadOpen ? 'Itago ang Kwaderno' : 'Kwaderno (Scratchpad)'}</span>
+                </button>
+              </div>
             )}
+
+            {/* In-lesson Scratchpad drawing canvas */}
+            <Scratchpad open={scratchpadOpen} onClose={() => setScratchpadOpen(false)} />
+
             {aiOpen === 'hint' && phase === 'answer' && (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 rounded-2xl bg-[#F2EAFD] border-2 border-grape/30 p-3 font-semibold text-[15px] whitespace-pre-line flex items-start gap-2">
                 <Icon name="tutor" size={24} className="shrink-0 mt-0.5" />
