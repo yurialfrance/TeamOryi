@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MODELS, isModelCached, loadModel, useAi, webgpuSupported } from '../ai/llm'
+import { MODELS, isModelCached, loadModel, modelInfo, useAi, webgpuSupported } from '../ai/llm'
 import { useGame } from '../store/game'
 import { Button, ProgressBar } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -16,25 +16,25 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
     Promise.all(MODELS.map(async (m) => [m.id, await isModelCached(m.id)] as const)).then((r) => setCached(Object.fromEntries(r)))
   }, [ai.status])
 
+  // No WebGPU → automatically switch to the CPU model so AI can still be turned on here
+  useEffect(() => {
+    if (gpu === false && modelInfo(aiModel).backend === 'gpu') set({ aiModel: 'cpu-qwen2.5-0.5b' })
+  }, [gpu, aiModel, set])
+
   const start = () => {
     set({ aiEnabled: true })
     loadModel(aiModel)
   }
-
-  if (gpu === false || ai.status === 'unsupported') {
-    return (
-      <div className="rounded-2xl border-2 border-line p-4 bg-cloud">
-        <div className="font-black text-lg mb-1 flex items-center gap-2"><Icon name="chip" size={28} style={{ filter: 'grayscale(1)' }} /> Walang WebGPU ang browser na ito</div>
-        <p className="text-ink-soft font-semibold text-[15px]">
-          Gagana pa rin ang Sipnayan! Si Pipo ay gagamit ng built-in na Taglish hints at step-by-step solutions. Para sa full AI, gamitin ang
-          bagong Chrome o Edge sa laptop o Android.
-        </p>
-      </div>
-    )
-  }
+  const choices = gpu === false ? MODELS.filter((m) => m.backend === 'cpu') : MODELS
 
   return (
     <div className="space-y-3">
+      {gpu === false && (
+        <div className="rounded-2xl bg-sun-soft border-2 border-sun p-3 text-[14px] font-semibold flex gap-2">
+          <Icon name="chip" size={26} />
+          <span>Walang WebGPU ang browser na ito, kaya gagamitin ang <b>CPU mode</b>. Gagana pa rin offline, pero mas mabagal sumagot.</span>
+        </div>
+      )}
       {!compact && (
         <div className="rounded-2xl bg-leaf-soft p-4 font-semibold text-[15px] flex gap-3">
           <Icon name="chip" size={36} /><span>Ang AI ay tumatakbo <b>sa device mo mismo</b> (WebLLM + WebGPU). Isang beses lang i-download, tapos gagana na kahit offline. Walang
@@ -42,7 +42,7 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
         </div>
       )}
       <div className="grid gap-2">
-        {MODELS.map((m) => (
+        {choices.map((m) => (
           <button key={m.id} disabled={ai.status === 'loading'} onClick={() => set({ aiModel: m.id })}
             className={`btn3d flex items-center justify-between p-3 border-2 bg-white text-left ${aiModel === m.id ? 'border-leaf bg-leaf-soft' : 'border-line'}`}
             style={{ ['--shadow' as string]: aiModel === m.id ? 'var(--color-leaf)' : '#E0D9E8' }}>
@@ -60,13 +60,17 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
           <div className="text-xs font-bold text-ink-soft line-clamp-2">{Math.round(ai.progress * 100)}% · {ai.progressText}</div>
         </div>
       ) : ai.status === 'ready' && ai.modelId === aiModel ? (
-        <div className="rounded-2xl bg-leaf-soft text-leaf-dark font-black p-3 flex items-center justify-center gap-2"><Icon name="shield" size={24} /> Handa na si Pipo AI — 100% offline!</div>
+        <div className="rounded-2xl bg-leaf-soft text-leaf-dark font-black p-3 flex items-center justify-center gap-2"><Icon name="shield" size={24} /> Handa na si Pipo AI{modelInfo(aiModel).backend === 'cpu' ? ' (CPU)' : ''} — 100% offline!</div>
       ) : (
         <Button tone="leaf" className="w-full" onClick={start}>
           {cached[aiModel] ? 'I-load ang AI' : 'I-download ang AI'}
         </Button>
       )}
-      {ai.status === 'error' && <div className="text-heart font-bold text-sm">May error: {ai.error}</div>}
+      {ai.status === 'error' && (
+        <div className="text-heart font-bold text-sm">
+          {/fetch|network|Load failed/i.test(ai.error ?? '') ? 'Hindi ma-download ang model — i-check ang internet connection at subukan ulit.' : `May error: ${ai.error}`}
+        </div>
+      )}
     </div>
   )
 }

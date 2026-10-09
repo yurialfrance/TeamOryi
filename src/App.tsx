@@ -7,7 +7,7 @@ import { CompleteScreen } from './screens/Complete'
 import { TutorScreen } from './screens/Tutor'
 import { ProfileScreen } from './screens/Profile'
 import { QuestsScreen } from './screens/Quests'
-import { isModelCached, loadModel } from './ai/llm'
+import { bestModelFor, isModelCached, loadModel } from './ai/llm'
 import { setMuted } from './lib/sfx'
 import { IconGallery } from './components/IconGallery'
 
@@ -18,7 +18,7 @@ export default function App() {
   useEffect(() => { setMuted(muted) }, [muted])
 
   useEffect(() => {
-    if (aiEnabled) isModelCached(aiModel).then((c) => { if (c) loadModel(aiModel) })
+    if (aiEnabled) bestModelFor(aiModel).then(async (id) => { if (await isModelCached(id)) loadModel(id) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (import.meta.env.DEV && location.search.includes('icons')) return <IconGallery />
