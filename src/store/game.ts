@@ -47,6 +47,7 @@ interface Persisted {
   aiModel: string
   aiLang: 'taglish' | 'english'
   muted: boolean
+  voiceEnabled: boolean
   gems: number
   todayLessons: number
   todayBestCombo: number
@@ -105,6 +106,7 @@ const initial: Persisted = {
   aiModel: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
   aiLang: 'taglish',
   muted: false,
+  voiceEnabled: true,
   gems: 100,
   todayLessons: 0,
   todayBestCombo: 0,

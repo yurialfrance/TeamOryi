@@ -8,6 +8,7 @@ import { BottomNav, Button, ProgressBar, TopStats } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import { AiSetupCard } from './AiSetup'
 import { setMuted } from '../lib/sfx'
+import { stopSpeaking } from '../lib/tts'
 
 type ProfileSubpage = 'main' | 'settings' | 'achievements' | 'curriculum' | 'ai'
 
@@ -309,6 +310,30 @@ export function ProfileScreen() {
                       onChange={(e) => {
                         s.set({ muted: !e.target.checked })
                         setMuted(!e.target.checked)
+                      }}
+                    />
+                  </label>
+
+                  {/* Audio Speech / Voice Synthesis Toggle */}
+                  <label className="flex items-center justify-between rounded-2xl border-2 border-line p-4 font-bold bg-white cursor-pointer hover:border-grape/50 transition">
+                    <span className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-xl bg-grape-soft flex items-center justify-center shrink-0">
+                        <Icon name={s.voiceEnabled !== false ? 'tutor' : 'speakerOff'} size={24} />
+                      </span>
+                      <div>
+                        <div className="font-black text-ink">Boses ni Pipo (Voice / TTS)</div>
+                        <div className="text-xs font-bold text-ink-soft">
+                          {s.voiceEnabled !== false ? 'Binabasa nang malakas ang Bakit Mali at hints' : 'Naka-off ang pagsasalita ng boses'}
+                        </div>
+                      </div>
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="w-6 h-6 accent-grape cursor-pointer"
+                      checked={s.voiceEnabled !== false}
+                      onChange={(e) => {
+                        s.set({ voiceEnabled: e.target.checked })
+                        if (!e.target.checked) stopSpeaking()
                       }}
                     />
                   </label>

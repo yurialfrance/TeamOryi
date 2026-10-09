@@ -17,6 +17,8 @@ import { gcd, shuffle } from '../engine/rand'
 import { aiReady as isAiReady } from '../ai/llm'
 import { sfx } from '../lib/sfx'
 import { hintMessages, stream, useAi, whyWrongMessages } from '../ai/llm'
+import { diagnoseMisconception, type MisconceptionReport } from '../engine/diagnostics'
+import { speakText, stopSpeaking } from '../lib/tts'
 
 const PRAISE = ['Ang galing mo!', 'Tumpak!', 'Lodi!', 'Sakto!', 'Petmalu!', 'Galing-galing!']
 const COMFORT = ['Okay lang, matututo tayo!', 'Muntik na!', 'Next time makukuha mo na!']
@@ -48,9 +50,25 @@ export function LessonScreen() {
   const [hintNo, setHintNo] = useState(0)
   const [combo, setCombo] = useState(0)
   const [bestCombo, setBestCombo] = useState(0)
+  const [diagnostic, setDiagnostic] = useState<MisconceptionReport | null>(null)
+  const [speakingTarget, setSpeakingTarget] = useState<'why' | 'hint' | 'diag' | null>(null)
   const start = useRef(Date.now())
   const mf = useRef<MathFieldHandle>(null)
   const aiReady = useAi((s) => s.status === 'ready')
+
+  const toggleSpeak = (text: string, target: 'why' | 'hint' | 'diag') => {
+    if (speakingTarget === target) {
+      stopSpeaking()
+      setSpeakingTarget(null)
+      return
+    }
+    sfx.tap()
+    speakText(text, {
+      onStart: () => setSpeakingTarget(target),
+      onEnd: () => setSpeakingTarget(null),
+      onError: () => setSpeakingTarget(null),
+    })
+  }
 
   if (!found) return null
   const { world, stage } = found
@@ -91,6 +109,8 @@ export function LessonScreen() {
       setPhase('wrong')
       setCombo(0)
       setMissed((s) => new Set(s).add(q.id))
+      const diag = diagnoseMisconception(q, current)
+      setDiagnostic(diag)
       if (!practice) loseHeart()
       // Duolingo-style: missed questions come back at the end
       setQueue((qs) => [...qs, { ...q, id: q.id }])
@@ -98,6 +118,9 @@ export function LessonScreen() {
   }
 
   const next = () => {
+    stopSpeaking()
+    setSpeakingTarget(null)
+    setDiagnostic(null)
     setAiOpen(null); setAiText(''); setHintNo(0); setNudge(null)
     const heartsLeft = useGame.getState().hearts
     const seconds = Math.round((Date.now() - start.current) / 1000)
@@ -142,12 +165,15 @@ export function LessonScreen() {
           : q.kind === 'pizzaChef' && value && typeof value === 'object' && 'num' in value
             ? `${(value as { num: number; den: number }).num}/${(value as { num: number; den: number }).den}`
             : String(value)
-    const out = await stream(whyWrongMessages(level, q, typed, aiLang), setAiText, fallback, 260)
+    const out = await stream(whyWrongMessages(level, q, typed, aiLang, diagnostic ?? undefined), setAiText, fallback, 260)
     const src = [q.prompt, q.latex ?? '', q.answerDisplay, typed, ...q.solution, ...q.hints]
     setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
   }
 
-  const quit = () => go('path')
+  const quit = () => {
+    stopSpeaking()
+    go('path')
+  }
 
   return (
     <div className="h-full flex flex-col bg-white relative overflow-hidden">
@@ -218,8 +244,18 @@ export function LessonScreen() {
               </button>
             )}
             {aiOpen === 'hint' && phase === 'answer' && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 rounded-2xl bg-[#F2EAFD] border-2 border-grape/30 p-3 font-semibold text-[15px] whitespace-pre-line flex gap-2">
-                <Icon name="tutor" size={24} /> <span className="min-w-0">{aiText ? <RichText text={aiText} /> : '…'}</span>
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 rounded-2xl bg-[#F2EAFD] border-2 border-grape/30 p-3 font-semibold text-[15px] whitespace-pre-line flex items-start gap-2">
+                <Icon name="tutor" size={24} className="shrink-0 mt-0.5" />
+                <span className="min-w-0 flex-1">{aiText ? <RichText text={aiText} /> : '…'}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleSpeak(aiText || q.hints[Math.max(0, hintNo - 1)] || '', 'hint')}
+                  className={`p-1.5 rounded-xl border border-grape/30 bg-white shrink-0 transition-transform active:scale-95 flex items-center gap-1 ${speakingTarget === 'hint' ? 'text-sky bg-sky-soft animate-pulse' : 'text-ink-soft hover:text-ink'}`}
+                  title="Pakinggan si Pipo"
+                  aria-label="Pakinggan si Pipo"
+                >
+                  <Icon name="speaker" size={18} />
+                </button>
               </motion.div>
             )}
           </motion.div>
@@ -258,33 +294,106 @@ export function LessonScreen() {
         {phase !== 'answer' && (
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className={`absolute left-0 right-0 bottom-0 z-30 px-5 pt-4 pb-6 safe-bottom ${phase === 'correct' ? 'bg-leaf-soft' : 'bg-heart-soft'}`}
+            className={`absolute left-0 right-0 bottom-0 z-30 px-5 pt-4 pb-6 safe-bottom max-h-[88vh] overflow-y-auto no-scrollbar ${phase === 'correct' ? 'bg-leaf-soft' : 'bg-heart-soft'}`}
           >
             <div className={`flex items-center gap-2.5 text-2xl font-black mb-2 ${phase === 'correct' ? 'text-leaf-dark' : 'text-heart-dark'}`}>
-              <span className={`w-9 h-9 rounded-full flex items-center justify-center ${phase === 'correct' ? 'bg-leaf' : 'bg-heart'}`}>
+              <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${phase === 'correct' ? 'bg-leaf' : 'bg-heart'}`}>
                 {phase === 'correct' ? <Icon name="check" size={22} /> : <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6 6 18" stroke="#fff" strokeWidth="4" strokeLinecap="round" /></svg>}
               </span>
               {phase === 'correct' ? PRAISE[idx % PRAISE.length] : COMFORT[idx % COMFORT.length]}
             </div>
+
             {phase === 'wrong' && (
-              <div className="text-heart-dark font-bold mb-2">
+              <div className="text-heart-dark font-bold mb-2.5 text-[15px]">
                 Tamang sagot: {answerDisplayLatex(q) ? <Tex tex={answerDisplayLatex(q)} /> : q.answerDisplay}
                 {q.kind === 'tiles' && <span className="ml-1"><Tex tex={q.answerSeq[0].join(' ')} /></span>}
               </div>
             )}
+
+            {/* "Bakit Mali Ako?" Misconception Diagnostic AI Card */}
+            {phase === 'wrong' && diagnostic && (
+              <div className="rounded-2xl bg-white border-2 border-heart/25 p-3.5 mb-3 shadow-[0_2px_8px_rgba(217,51,85,0.08)]">
+                <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-line">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide ${diagnostic.badgeBg} ${diagnostic.badgeText}`}>
+                      {diagnostic.badge}
+                    </span>
+                    <span className="font-black text-sm text-ink">{diagnostic.title}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSpeak(diagnostic.speechText, 'diag')}
+                    className={`px-2 py-1 rounded-xl border border-line bg-cloud/50 shrink-0 transition-transform active:scale-95 flex items-center gap-1 ${speakingTarget === 'diag' ? 'text-sky bg-sky-soft animate-pulse' : 'text-ink-soft hover:text-ink'}`}
+                    title="Pakinggan si Pipo"
+                    aria-label="Pakinggan si Pipo"
+                  >
+                    <Icon name="speaker" size={18} />
+                    <span className="text-[11px] font-black">{speakingTarget === 'diag' ? 'Nagsasalita…' : 'Basahin'}</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 my-2 text-xs">
+                  <div className="p-2 rounded-xl bg-heart-soft/60 border border-heart/20">
+                    <div className="font-black uppercase text-[10px] text-heart-dark mb-0.5">Nagawa mo:</div>
+                    <div className="font-bold text-ink text-[13px] overflow-x-auto whitespace-nowrap">
+                      {diagnostic.userDid.startsWith('\\') || diagnostic.userDid.includes('^') || diagnostic.userDid.includes('\\frac') ? (
+                        <Tex tex={diagnostic.userDid} />
+                      ) : (
+                        diagnostic.userDid
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-leaf-soft/60 border border-leaf/20">
+                    <div className="font-black uppercase text-[10px] text-leaf-dark mb-0.5">Dapat na hakbang:</div>
+                    <div className="font-bold text-ink text-[13px] overflow-x-auto whitespace-nowrap">
+                      {diagnostic.correctStep.startsWith('\\') || diagnostic.correctStep.includes('^') || diagnostic.correctStep.includes('\\frac') ? (
+                        <Tex tex={diagnostic.correctStep} />
+                      ) : (
+                        diagnostic.correctStep
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[13px] font-semibold text-ink leading-snug mb-2">
+                  {diagnostic.taglishSummary}
+                </div>
+                <div className="text-[11px] font-bold text-ink-soft bg-cloud/80 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
+                  <Icon name="bulb" size={16} className="shrink-0 text-sun-dark" />
+                  <span>{diagnostic.ruleTip}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Socratic Deep Guidance from Pipo */}
             {phase === 'wrong' && (
               <>
                 {aiOpen === 'why' ? (
-                  <div className="max-h-48 overflow-y-auto rounded-2xl bg-white p-3 mb-3 font-semibold text-[15px] whitespace-pre-line border-2 border-heart/20 flex gap-2">
-                    <Icon name="tutor" size={24} /> <span className="min-w-0">{aiText ? <RichText text={aiText} /> : 'Nag-iisip si Pipo…'}</span>
+                  <div className="max-h-44 overflow-y-auto rounded-2xl bg-white p-3 mb-3 font-semibold text-[14px] whitespace-pre-line border-2 border-heart/20 flex flex-col gap-2">
+                    <div className="flex items-center justify-between border-b border-line pb-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+                        <Icon name="tutor" size={20} /> Paliwanag ni Pipo
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSpeak(aiText || 'Nag-iisip pa si Pipo…', 'why')}
+                        className={`px-2 py-0.5 rounded-lg border border-line bg-cloud/50 shrink-0 transition-transform active:scale-95 flex items-center gap-1 ${speakingTarget === 'why' ? 'text-sky bg-sky-soft animate-pulse' : 'text-ink-soft'}`}
+                        title="Pakinggan si Pipo"
+                      >
+                        <Icon name="speaker" size={16} />
+                        <span className="text-[10px] font-black">{speakingTarget === 'why' ? 'Nagsasalita…' : 'Makinig'}</span>
+                      </button>
+                    </div>
+                    <span className="min-w-0">{aiText ? <RichText text={aiText} /> : 'Nag-iisip si Pipo…'}</span>
                   </div>
                 ) : (
-                  <button onClick={askWhy} className="btn3d mb-3 inline-flex items-center gap-2 pl-2 pr-3 py-1.5 bg-white font-black text-heart-dark text-sm border-2 border-heart/30" style={{ ['--shadow' as string]: 'rgba(217,51,85,.25)' }}>
-                    <Icon name="tutor" size={22} /> Bakit mali? {aiReady ? '(AI)' : ''}
+                  <button onClick={askWhy} className="btn3d mb-3 w-full justify-center inline-flex items-center gap-2 px-3 py-1.5 bg-white font-black text-heart-dark text-sm border-2 border-heart/30" style={{ ['--shadow' as string]: 'rgba(217,51,85,.25)' }}>
+                    <Icon name="tutor" size={20} /> {aiReady ? 'Tanungin si Pipo (AI Socratic Guide)' : 'Bakit mali? (Buong paliwanag ni Pipo)'}
                   </button>
                 )}
               </>
             )}
+
             {phase === 'correct' && q.solution.length > 0 && (
               <div className="text-leaf-dark font-bold text-[15px] mb-3 opacity-90">{q.solution[q.solution.length - 1]}</div>
             )}

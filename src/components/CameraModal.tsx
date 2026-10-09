@@ -28,11 +28,17 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const sketchCanvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const isDrawing = useRef(false)
+
+  const startCamera = () => {
+    setCameraError(null)
+    setRetryKey((k) => k + 1)
+  }
 
   // Start / stop camera stream based on modal and tab
   useEffect(() => {
@@ -73,7 +79,7 @@ export function CameraModal({ open, onClose, onCapture }: CameraModalProps) {
         streamRef.current = null
       }
     }
-  }, [open, tab])
+  }, [open, tab, retryKey])
 
   // Handle canvas sketch events
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {

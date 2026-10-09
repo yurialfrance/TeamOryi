@@ -24,6 +24,7 @@ export const Tex = memo(function Tex({ tex, className = '' }: { tex: string; cla
 export interface MathFieldHandle {
   press: (key: KeyDef) => void
   insert: (latex: string) => void
+  set: (latex: string) => void
   clear: () => void
   value: () => string
   focus: () => void
@@ -99,6 +100,12 @@ export const MathField = forwardRef<MathFieldHandle, Props>(function MathField(
       if (!mf) return
       mf.executeCommand(['insert', latex, { selectionMode: 'placeholder', focus: true, format: 'latex' }])
       cb.current.onChange?.(mf.value)
+    },
+    set(latex) {
+      const mf = mfRef.current
+      if (!mf) return
+      mf.value = latex
+      cb.current.onChange?.(latex)
     },
     clear() {
       if (mfRef.current) mfRef.current.value = ''

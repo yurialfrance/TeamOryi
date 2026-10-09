@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import type { WebWorkerMLCEngine } from '@mlc-ai/web-llm'
 import type { Wllama } from '@wllama/wllama/esm/index.js'
 import type { Question } from '../engine/types'
+import type { MisconceptionReport } from '../engine/diagnostics'
 
 export type Backend = 'gpu' | 'cpu'
 export interface ModelInfo { id: string; label: string; size: string; note: string; noteEn: string; backend: Backend; hf?: { repo: string; file: string } }
@@ -227,9 +228,21 @@ export function hintMessages(level: string, q: Question, hintNo: number, lang: A
   ]
 }
 
-export function whyWrongMessages(level: string, q: Question, userAnswer: string, lang: AiLang = 'taglish'): ChatMsg[] {
+export function whyWrongMessages(
+  level: string,
+  q: Question,
+  userAnswer: string,
+  lang: AiLang = 'taglish',
+  diagnostic?: MisconceptionReport
+): ChatMsg[] {
+  const diagText = diagnostic
+    ? `\nDIAGNOSED MISCONCEPTION: ${diagnostic.title} (${diagnostic.badge})\nWhat happened: ${diagnostic.taglishSummary}\nKey Rule: ${diagnostic.ruleTip}`
+    : ''
   return [
     ...baseMessages(level, lang),
-    { role: 'user', content: `${questionContext(q)}\nMy wrong answer: ${userAnswer || '(none)'}\n\nKindly explain where I probably went wrong, then walk through the correct steps above. 3–4 sentences.` },
+    {
+      role: 'user',
+      content: `${questionContext(q)}\nMy wrong answer: ${userAnswer || '(none)'}${diagText}\n\nKindly address this exact mistake warmly, explain why this misconception occurs, and walk through the correct solution. 3–4 sentences.`,
+    },
   ]
 }
