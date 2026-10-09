@@ -13,38 +13,48 @@ import { exportBackupString, importBackupString } from '../store/backup'
 
 type ProfileSubpage = 'main' | 'settings' | 'achievements' | 'curriculum' | 'ai'
 
+const HAWAIIAN_WEEKDAYS = ['L', 'M', 'M', 'H', 'P', 'A', 'K'] as const
+
 function getCalendarData(activity: Record<string, number>) {
-  const now = Date.now()
-  const days = Array.from({ length: 28 }, (_, i) => {
-    const d = new Date(now)
-    d.setDate(d.getDate() - (27 - i))
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = new Date(year, month, i + 1)
     const key = d.toLocaleDateString('en-CA')
-    return { key, xp: activity[key] ?? 0, label: d.getDate() }
+    return { key, xp: activity[key] ?? 0, label: i + 1 }
   })
-  const lead = (new Date(days[0].key + 'T00:00').getDay() + 6) % 7
-  return { days, lead }
+  const trail = (7 - ((lead + days.length) % 7)) % 7
+  const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  return { days, lead, trail, monthName }
 }
 
 function Calendar({ activity }: { activity: Record<string, number> }) {
-  const { days, lead } = useMemo(() => getCalendarData(activity), [activity])
+  const { days, lead, trail, monthName } = useMemo(() => getCalendarData(activity), [activity])
 
   return (
-    <div className="grid grid-cols-7 gap-1.5">
-      {['L', 'M', 'M', 'H', 'B', 'S', 'L'].map((d, i) => (
-        <div key={i} className="text-center text-[11px] font-black text-ink-soft">{d}</div>
-      ))}
-      {Array.from({ length: lead }, (_, i) => <div key={'p' + i} />)}
-      {days.map((d) => (
-        <div
-          key={d.key}
-          title={`${d.key}: ${d.xp} XP`}
-          className={`aspect-square rounded-xl flex items-center justify-center text-xs font-black transition-transform hover:scale-105 ${
-            d.xp ? 'bg-[#FFF0E0] shadow-xs' : 'bg-cloud text-ink-soft'
-          }`}
-        >
-          {d.xp ? <Icon name="flame" size={22} /> : d.label}
-        </div>
-      ))}
+    <div>
+      <div className="text-center text-sm font-black text-ink mb-2">{monthName}</div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {HAWAIIAN_WEEKDAYS.map((d, i) => (
+          <div key={i} className="text-center text-[11px] font-black text-ink-soft">{d}</div>
+        ))}
+        {Array.from({ length: lead }, (_, i) => <div key={'p' + i} />)}
+        {days.map((d) => (
+          <div
+            key={d.key}
+            title={`${d.key}: ${d.xp} XP`}
+            className={`aspect-square rounded-xl flex items-center justify-center text-xs font-black transition-transform hover:scale-105 ${
+              d.xp ? 'bg-[#FFF0E0] shadow-xs' : 'bg-cloud text-ink-soft'
+            }`}
+          >
+            {d.xp ? <Icon name="flame" size={22} /> : d.label}
+          </div>
+        ))}
+        {Array.from({ length: trail }, (_, i) => <div key={'t' + i} />)}
+      </div>
     </div>
   )
 }
