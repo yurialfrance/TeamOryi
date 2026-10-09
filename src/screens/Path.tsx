@@ -11,7 +11,7 @@ import { Island, SKY, SoonIsland, WorldCard } from '../components/IslandMap'
 
 export function PathScreen() {
   const s = useGame()
-  const { level, todayXp, dailyGoal, startLesson, isUnlocked, completed, hearts, gems, buyRefill, go } = s
+  const { level, todayXp, dailyGoal, startLesson, startLearn, isUnlocked, completed, hearts, gems, buyRefill, go } = s
   const [selectedWorldId, setSelectedWorldId] = useState<string | null>(level || 'primary')
   const [open, setOpen] = useState<{ world: World; stage: Stage; index: number } | null>(null)
   const [guide, setGuide] = useState<World | null>(null)
@@ -148,9 +148,13 @@ export function PathScreen() {
                   Mag-practice para sa hearts
                 </Button>
               </div>
-            ) : (
+            ) : completed[open.stage.id] ? (
               <Button tone="white" className="w-full" style={{ color: open.world.colorDark }} onClick={() => startLesson(open.stage.id)}>
-                {completed[open.stage.id] ? 'Ulitin' : 'Simulan'} · +60 XP
+                Ulitin · +60 XP
+              </Button>
+            ) : (
+              <Button tone="white" className="w-full" style={{ color: open.world.colorDark }} onClick={() => startLearn(open.stage.id)}>
+                <Icon name="bulb" size={22} /> Matuto muna
               </Button>
             )}
           </div>

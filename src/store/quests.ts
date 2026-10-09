@@ -29,22 +29,29 @@ export interface Achievement {
   icon: IconName
   color: string
   done: (s: S) => boolean
+  /** 0..1 — how close the learner is, for a gradually-coloring-in badge */
+  progress: (s: S) => number
 }
 
 const worldDone = (s: S, id: string) => WORLDS.find((w) => w.id === id)!.stages.every((st) => s.completed[st.id])
+const worldProgress = (s: S, id: string) => {
+  const stages = WORLDS.find((w) => w.id === id)!.stages
+  return stages.filter((st) => s.completed[st.id]).length / stages.length
+}
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first', title: 'Unang Hakbang', desc: 'Tapusin ang unang stage', icon: 'steps', color: '#FF8FB1', done: (s) => s.lessonsDone >= 1 },
-  { id: 'fire', title: 'Nag-aapoy', desc: '3-day streak', icon: 'flame', color: '#FF8A1F', done: (s) => s.streak >= 3 },
-  { id: 'perfect', title: 'Perpekto', desc: 'Isang perfect lesson', icon: 'crown', color: '#FFC83D', done: (s) => s.perfectCount >= 1 },
-  { id: 'chest', title: 'Kolektor', desc: 'Magbukas ng 3 chest', icon: 'chest', color: '#D9893D', done: (s) => s.openedChests.length >= 3 },
-  { id: 'primary', title: 'Suki ng Tindahan', desc: 'Tapusin ang Grade 1–3 world', icon: 'store', color: '#FF4B6E', done: (s) => worldDone(s, 'primary') },
-  { id: 'elem', title: 'Pizza Master', desc: 'Tapusin ang fractions world', icon: 'pizza', color: '#FF8A1F', done: (s) => worldDone(s, 'elem') },
-  { id: 'inter', title: 'Barkada Boss', desc: 'Tapusin ang Grade 5–6 world', icon: 'blocks', color: '#00A6A6', done: (s) => worldDone(s, 'inter') },
-  { id: 'jhs', title: 'Timbangan Pro', desc: 'Tapusin ang Grade 7 world', icon: 'scale', color: '#2F6BFF', done: (s) => worldDone(s, 'jhs') },
-  { id: 'g9', title: 'Quadratic Hero', desc: 'Tapusin ang Grade 9 world', icon: 'target', color: '#E64A8A', done: (s) => worldDone(s, 'g9') },
-  { id: 'shs', title: 'Ipon Hari', desc: 'Tapusin ang Ipon Challenge', icon: 'coins', color: '#3DBE6B', done: (s) => worldDone(s, 'shs') },
-  { id: 'stats', title: 'Data Detective', desc: 'Tapusin ang Stats world', icon: 'chartUp', color: '#1F9BD1', done: (s) => worldDone(s, 'stats') },
-  { id: 'college', title: 'Kalikasan', desc: 'Tapusin ang MMW world', icon: 'sunflower', color: '#9B5DE5', done: (s) => worldDone(s, 'college') },
-  { id: 'scholar', title: 'Iskolar', desc: 'Kumita ng 500 XP', icon: 'book', color: '#1F4FD1', done: (s) => s.xp >= 500 },
+  { id: 'first', title: 'Unang Hakbang', desc: 'Tapusin ang unang stage', icon: 'steps', color: '#FF8FB1', done: (s) => s.lessonsDone >= 1, progress: (s) => clamp01(s.lessonsDone / 1) },
+  { id: 'fire', title: 'Nag-aapoy', desc: '3-day streak', icon: 'flame', color: '#FF8A1F', done: (s) => s.streak >= 3, progress: (s) => clamp01(s.streak / 3) },
+  { id: 'perfect', title: 'Perpekto', desc: 'Isang perfect lesson', icon: 'crown', color: '#FFC83D', done: (s) => s.perfectCount >= 1, progress: (s) => clamp01(s.perfectCount / 1) },
+  { id: 'chest', title: 'Kolektor', desc: 'Magbukas ng 3 chest', icon: 'chest', color: '#D9893D', done: (s) => s.openedChests.length >= 3, progress: (s) => clamp01(s.openedChests.length / 3) },
+  { id: 'primary', title: 'Suki ng Tindahan', desc: 'Tapusin ang Grade 1–3 world', icon: 'store', color: '#FF4B6E', done: (s) => worldDone(s, 'primary'), progress: (s) => worldProgress(s, 'primary') },
+  { id: 'elem', title: 'Pizza Master', desc: 'Tapusin ang fractions world', icon: 'pizza', color: '#FF8A1F', done: (s) => worldDone(s, 'elem'), progress: (s) => worldProgress(s, 'elem') },
+  { id: 'inter', title: 'Barkada Boss', desc: 'Tapusin ang Grade 5–6 world', icon: 'blocks', color: '#00A6A6', done: (s) => worldDone(s, 'inter'), progress: (s) => worldProgress(s, 'inter') },
+  { id: 'jhs', title: 'Timbangan Pro', desc: 'Tapusin ang Grade 7 world', icon: 'scale', color: '#2F6BFF', done: (s) => worldDone(s, 'jhs'), progress: (s) => worldProgress(s, 'jhs') },
+  { id: 'g9', title: 'Quadratic Hero', desc: 'Tapusin ang Grade 9 world', icon: 'target', color: '#E64A8A', done: (s) => worldDone(s, 'g9'), progress: (s) => worldProgress(s, 'g9') },
+  { id: 'shs', title: 'Ipon Hari', desc: 'Tapusin ang Ipon Challenge', icon: 'coins', color: '#3DBE6B', done: (s) => worldDone(s, 'shs'), progress: (s) => worldProgress(s, 'shs') },
+  { id: 'stats', title: 'Data Detective', desc: 'Tapusin ang Stats world', icon: 'chartUp', color: '#1F9BD1', done: (s) => worldDone(s, 'stats'), progress: (s) => worldProgress(s, 'stats') },
+  { id: 'college', title: 'Kalikasan', desc: 'Tapusin ang MMW world', icon: 'sunflower', color: '#9B5DE5', done: (s) => worldDone(s, 'college'), progress: (s) => worldProgress(s, 'college') },
+  { id: 'scholar', title: 'Iskolar', desc: 'Kumita ng 500 XP', icon: 'book', color: '#1F4FD1', done: (s) => s.xp >= 500, progress: (s) => clamp01(s.xp / 500) },
 ]

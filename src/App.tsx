@@ -2,11 +2,14 @@ import { useEffect } from 'react'
 import { useGame } from './store/game'
 import { Onboarding } from './screens/Onboarding'
 import { PathScreen } from './screens/Path'
+import { LearnScreen } from './screens/Learn'
 import { LessonScreen } from './screens/Lesson'
 import { CompleteScreen } from './screens/Complete'
 import { TutorScreen } from './screens/Tutor'
 import { ProfileScreen } from './screens/Profile'
 import { QuestsScreen } from './screens/Quests'
+import { GamesScreen } from './screens/Games'
+import { DuelScreen } from './screens/Duel'
 import { bestModelFor, isModelCached, loadModel } from './ai/llm'
 import { setMuted } from './lib/sfx'
 import { IconGallery } from './components/IconGallery'
@@ -28,11 +31,14 @@ export default function App() {
       <div className="relative h-full w-full max-w-[480px] bg-white shadow-[0_0_40px_rgba(60,51,70,.12)] overflow-hidden">
         {screen === 'onboarding' && <Onboarding />}
         {screen === 'path' && <PathScreen />}
+        {screen === 'learn' && stageId && <LearnScreen key={stageId} />}
         {screen === 'lesson' && stageId && <LessonScreen key={stageId} />}
         {screen === 'complete' && <CompleteScreen />}
         {screen === 'tutor' && <TutorScreen />}
         {screen === 'profile' && <ProfileScreen />}
         {screen === 'quests' && <QuestsScreen />}
+        {screen === 'games' && <GamesScreen />}
+        {screen === 'duel' && <DuelScreen />}
       </div>
     </div>
   )

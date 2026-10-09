@@ -58,19 +58,20 @@ export function BottomNav() {
   const state = useGame()
   const { screen, go } = state
   const questsReady = dailyQuests(state).some((q) => q.progress(state) >= q.target && !isClaimed(state, q.id))
-  const items: { id: 'path' | 'quests' | 'tutor' | 'profile'; icon: IconName; label: string }[] = [
+  const items: { id: 'path' | 'games' | 'quests' | 'tutor' | 'profile'; icon: IconName; label: string }[] = [
     { id: 'path', icon: 'home', label: 'Landas' },
+    { id: 'games', icon: 'versus', label: 'Games' },
     { id: 'quests', icon: 'chest', label: 'Quests' },
     { id: 'tutor', icon: 'tutor', label: 'Tutor' },
     { id: 'profile', icon: 'medal', label: 'Ako' },
   ]
   return (
-    <nav className="border-t-2 border-line bg-white grid grid-cols-4 safe-bottom px-2">
+    <nav className="border-t-2 border-line bg-white grid grid-cols-5 safe-bottom px-1">
       {items.map((it) => {
         const on = screen === it.id
         return (
           <button key={it.id} type="button" onClick={() => go(it.id)} className="py-1.5 flex flex-col items-center gap-0.5 relative">
-            <span className={`w-14 h-11 flex items-center justify-center rounded-2xl border-2 transition-colors ${on ? 'bg-sky-soft border-sky' : 'border-transparent'}`}>
+            <span className={`w-12 h-11 flex items-center justify-center rounded-2xl border-2 transition-colors ${on ? 'bg-sky-soft border-sky' : 'border-transparent'}`}>
               <Icon name={it.icon} size={30} style={on ? undefined : { filter: 'saturate(.75)' }} />
             </span>
             {it.id === 'quests' && questsReady && <span className="absolute top-1 right-4 w-3 h-3 rounded-full bg-heart border-2 border-white" />}

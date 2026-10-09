@@ -29,16 +29,26 @@ function Calendar({ activity }: { activity: Record<string, number> }) {
   )
 }
 
-/** Hexagon achievement badge */
-function Badge({ icon, color, done }: { icon: IconName; color: string; done: boolean }) {
+/** Hexagon achievement badge — gradually fills with color as progress rises toward 1 */
+function Badge({ id, icon, color, progress }: { id: string; icon: IconName; color: string; progress: number }) {
+  const p = Math.min(1, Math.max(0, progress))
+  const clipId = `badge-clip-${id}`
   return (
     <div className="relative w-[68px] h-[76px] flex items-center justify-center">
       <svg viewBox="0 0 68 76" className="absolute inset-0">
-        <path d="M34 4 62 20v36L34 72 6 56V20Z" fill={done ? color : '#E5E0EA'} />
-        <path d="M34 4 62 20v36L34 72Z" fill="#000" opacity={done ? 0.12 : 0.05} />
-        <path d="M34 12 55 24v28L34 64 13 52V24Z" fill="#fff" opacity={done ? 0.92 : 0.7} />
+        <defs>
+          <clipPath id={clipId}><rect x="0" y={76 * (1 - p)} width="68" height={76 * p} /></clipPath>
+        </defs>
+        <path d="M34 4 62 20v36L34 72 6 56V20Z" fill="#E5E0EA" />
+        <path d="M34 4 62 20v36L34 72Z" fill="#000" opacity={0.05} />
+        <path d="M34 12 55 24v28L34 64 13 52V24Z" fill="#fff" opacity={0.7} />
+        <g clipPath={`url(#${clipId})`} style={{ transition: 'clip-path .4s ease' }}>
+          <path d="M34 4 62 20v36L34 72 6 56V20Z" fill={color} />
+          <path d="M34 4 62 20v36L34 72Z" fill="#000" opacity={0.12} />
+          <path d="M34 12 55 24v28L34 64 13 52V24Z" fill="#fff" opacity={0.92} />
+        </g>
       </svg>
-      <Icon name={icon} size={32} className="relative" style={done ? undefined : { filter: 'grayscale(1)', opacity: 0.35 }} />
+      <Icon name={icon} size={32} className="relative" style={p >= 1 ? undefined : { filter: `grayscale(${1 - p})`, opacity: 0.35 + 0.65 * p }} />
     </div>
   )
 }
@@ -76,6 +86,7 @@ export function ProfileScreen() {
                 ['sun', s.xp, 'Total XP'],
                 ['target', `${stagesDone}/${totalStages}`, 'Stages'],
                 ['star', stars, 'Stars'],
+                ['versus', s.duelWins, 'Duel wins'],
               ] as [IconName, number | string, string][]).map(([icon, v, l]) => (
                 <div key={l} className="rounded-2xl border-2 border-line p-3 flex items-center gap-3">
                   <Icon name={icon} size={30} />
@@ -90,16 +101,26 @@ export function ProfileScreen() {
             <div className="grid grid-cols-3 gap-y-4">
               {ACHIEVEMENTS.map((a) => {
                 const done = a.done(s)
+                const progress = Math.min(1, Math.max(0, a.progress(s)))
                 return (
                   <div key={a.id} className="flex flex-col items-center text-center">
                     {BADGE_ART.has(a.id) ? (
-                      <img src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`} alt={a.title} width={76} height={76}
-                        className="w-[76px] h-[76px] object-contain" style={done ? undefined : { filter: 'grayscale(1)', opacity: 0.35 }} />
+                      <div className="relative w-[76px] h-[76px]">
+                        <img src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`} alt={a.title} width={76} height={76}
+                          className="absolute inset-0 w-full h-full object-contain" style={{ filter: 'grayscale(1)', opacity: 0.35 }} />
+                        <img src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`} alt="" aria-hidden width={76} height={76}
+                          className="absolute inset-0 w-full h-full object-contain" style={{ clipPath: `inset(${(1 - progress) * 100}% 0 0 0)`, transition: 'clip-path .4s ease' }} />
+                      </div>
                     ) : (
-                      <Badge icon={a.icon} color={a.color} done={done} />
+                      <Badge id={a.id} icon={a.icon} color={a.color} progress={progress} />
                     )}
                     <div className={`text-[13px] font-black leading-tight mt-1 ${done ? '' : 'text-ink-soft'}`}>{a.title}</div>
                     <div className="text-[11px] font-semibold text-ink-soft leading-tight">{a.desc}</div>
+                    {!done && progress > 0 && (
+                      <div className="w-[52px] h-1.5 rounded-full bg-line overflow-hidden mt-1">
+                        <div className="h-full rounded-full bg-sun" style={{ width: `${progress * 100}%` }} />
+                      </div>
+                    )}
                   </div>
                 )
               })}

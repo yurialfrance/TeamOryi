@@ -11,7 +11,7 @@ const yesterday = () => {
   return d.toLocaleDateString('en-CA')
 }
 
-export type Screen = 'onboarding' | 'path' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests'
+export type Screen = 'onboarding' | 'path' | 'learn' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests' | 'games' | 'duel'
 
 export const REFILL_COST = 30
 export const CHEST_GEMS = 20
@@ -55,6 +55,8 @@ interface Persisted {
   openedChests: string[]
   perfectCount: number
   lessonsDone: number
+  duelWins: number
+  duelsPlayed: number
 }
 
 interface Volatile {
@@ -67,7 +69,9 @@ interface Volatile {
 interface Actions {
   set: (p: Partial<Persisted & Volatile>) => void
   go: (screen: Screen) => void
+  startLearn: (stageId: string) => void
   startLesson: (stageId: string, practice?: boolean) => void
+  recordDuel: (won: boolean) => void
   loseHeart: () => void
   refillHearts: () => void
   finishLesson: (r: Omit<LessonResult, 'streakUp'>) => void
@@ -105,6 +109,8 @@ const initial: Persisted = {
   openedChests: [],
   perfectCount: 0,
   lessonsDone: 0,
+  duelWins: 0,
+  duelsPlayed: 0,
 }
 
 export const useGame = create<Persisted & Volatile & Actions>()(
@@ -118,7 +124,9 @@ export const useGame = create<Persisted & Volatile & Actions>()(
 
       set: (p) => set(p),
       go: (screen) => set({ screen }),
+      startLearn: (stageId) => set({ stageId, screen: 'learn' }),
       startLesson: (stageId, practice = false) => set({ stageId, practice, screen: 'lesson', result: null }),
+      recordDuel: (won) => set((s) => ({ duelsPlayed: s.duelsPlayed + 1, duelWins: s.duelWins + (won ? 1 : 0) })),
       loseHeart: () => set((s) => ({ hearts: Math.max(0, s.hearts - 1) })),
       refillHearts: () => set({ hearts: MAX_HEARTS }),
 
