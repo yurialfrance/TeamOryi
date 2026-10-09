@@ -37,7 +37,7 @@ function StatCard({ label, value, color, icon, delay }: { label: string; value: 
 }
 
 export function CompleteScreen() {
-  const { result, streak, go, buyRefill, refillHearts, startLesson, gems } = useGame()
+  const { result, streak, go, buyRefill, startLesson, gems } = useGame()
   const found = result ? findStage(result.stageId) : null
   const xp = useCountUp(result?.xp ?? 0, 300)
   const accTarget = result ? Math.round((result.correct / result.total) * 100) : 0
@@ -68,7 +68,8 @@ export function CompleteScreen() {
           <Button tone="sky" className="w-full" disabled={gems < REFILL_COST} onClick={() => { if (buyRefill()) startLesson(result.stageId) }}>
             <Icon name="heartPlus" size={22} /> Refill · <Icon name="gem" size={18} /> {REFILL_COST}
           </Button>
-          <Button tone="white" className="w-full" onClick={() => { refillHearts(); go('path') }}>Mag-practice muna</Button>
+          <Button tone="white" className="w-full" onClick={() => startLesson(result.stageId, true)}><Icon name="heartPlus" size={22} /> Mag-practice para sa hearts</Button>
+          {gems < REFILL_COST && <p className="text-xs font-bold text-ink-soft">Kulang ang gems para sa refill. Mag-practice (walang mawawalang heart) para makakuha ulit ng hearts!</p>}
         </div>
       </div>
     )
@@ -78,9 +79,9 @@ export function CompleteScreen() {
   return (
     <div className="h-full flex flex-col bg-white px-6 pt-10 pb-8 text-center">
       <motion.div initial={{ scale: 0.4, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 12 }}>
-        <Pipo mood={perfect ? 'trophy' : 'jump'} size={180} className="mx-auto" />
+        <Pipo mood={result.practice ? 'heart' : perfect ? 'star' : 'trophy'} size={180} className="mx-auto" />
       </motion.div>
-      <h1 className="text-[32px] font-black mt-2 text-sun-dark leading-tight">{perfect ? 'Perfect lesson!' : 'Stage complete!'}</h1>
+      <h1 className="text-[32px] font-black mt-2 text-sun-dark leading-tight">{result.practice ? 'Practice complete!' : perfect ? 'Perfect lesson!' : 'Stage complete!'}</h1>
       <p className="text-ink-soft font-bold mt-1 flex items-center justify-center gap-1.5"><Icon name={found.stage.icon} size={22} /> {found.stage.title} · {found.world.level}</p>
 
       <div className="flex gap-2.5 mt-7">
@@ -89,6 +90,12 @@ export function CompleteScreen() {
         <StatCard label="Bilis" value={`${mm}:${ss}`} color="#2F6BFF" icon="clock" delay={0.5} />
       </div>
 
+      {result.practice && (
+        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6 }}
+          className="mt-5 rounded-2xl bg-heart-soft border-2 border-heart p-3 flex items-center justify-center gap-2 font-black text-heart-dark">
+          <Icon name="heartPlus" size={30} /> +{result.heartsEarned ?? 0} hearts mula sa practice!
+        </motion.div>
+      )}
       {result.bestCombo >= 3 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-4 inline-flex mx-auto items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF0E0] text-flame font-black">
           <Icon name="bolt" size={20} /> {result.bestCombo} sunod-sunod na tama!

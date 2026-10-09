@@ -7,16 +7,17 @@ import type { Wllama } from '@wllama/wllama/esm/index.js'
 import type { Question } from '../engine/types'
 
 export type Backend = 'gpu' | 'cpu'
-export interface ModelInfo { id: string; label: string; size: string; note: string; backend: Backend; hf?: { repo: string; file: string } }
+export interface ModelInfo { id: string; label: string; size: string; note: string; noteEn: string; backend: Backend; hf?: { repo: string; file: string } }
 
 export const MODELS: ModelInfo[] = [
-  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', label: 'Pipo Smart (1.5B)', size: '≈ 1.0 GB', note: 'Pinakamagaling mag-explain · WebGPU', backend: 'gpu' },
-  { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', label: 'Pipo Lite (0.5B)', size: '≈ 0.4 GB', note: 'Para sa mas mahinang device · WebGPU', backend: 'gpu' },
+  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', label: 'Pipo Smart (1.5B)', size: '≈ 1.0 GB', note: 'Pinakamagaling mag-explain · WebGPU', noteEn: 'Best explanations · WebGPU', backend: 'gpu' },
+  { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', label: 'Pipo Lite (0.5B)', size: '≈ 0.4 GB', note: 'Para sa mas mahinang device · WebGPU', noteEn: 'For lighter devices · WebGPU', backend: 'gpu' },
   {
     id: 'cpu-qwen2.5-0.5b',
     label: 'Pipo CPU (0.5B)',
     size: '≈ 0.5 GB',
     note: 'Gumagana kahit walang WebGPU · mas mabagal',
+    noteEn: 'Works without WebGPU · slower',
     backend: 'cpu',
     hf: { repo: 'Qwen/Qwen2.5-0.5B-Instruct-GGUF', file: 'qwen2.5-0.5b-instruct-q4_k_m.gguf' },
   },
@@ -196,7 +197,8 @@ export function systemPrompt(level: string, lang: AiLang = 'taglish') {
   return [
     `You are Pipo, a cheerful pig who is a math tutor for Filipino students. You are talking to ${LEVEL[level] ?? 'a student'}.`,
     LANG_RULE[lang],
-    'Keep answers short: 2–4 sentences.',
+    'Keep answers short: 2–3 sentences. Never invent a new problem or new numbers. Never use letters like a, b unless they are in the problem.',
+    'If the student says the answer is wrong, do not agree just to be polite — the calculator result is correct; kindly explain it again.',
     'Write EVERY math expression inside $...$ using LaTeX, e.g. $\\frac{1}{2}$ or $2x + 3 = 11$.',
     'IMPORTANT: Do NOT calculate anything yourself. A calculator already computed the correct answer; only explain the steps you are given, using exactly those numbers.',
     'If the student asks for a computation and no calculator result is given, ask them to type the problem in the math box.',
@@ -204,23 +206,9 @@ export function systemPrompt(level: string, lang: AiLang = 'taglish') {
 }
 
 /** Few-shot examples teach small models the tone + format far better than instructions alone */
-const FEW_SHOT: Record<AiLang, ChatMsg[]> = {
-  taglish: [
-    { role: 'user', content: 'Paano mag-add ng fractions na pareho ang denominator?' },
-    { role: 'assistant', content: 'Easy lang! Kapag pareho ang denominator, i-add mo lang ang numerators, tapos same pa rin ang denominator. Halimbawa: $\\frac{1}{5} + \\frac{2}{5} = \\frac{3}{5}$. Kaya mo \'yan!' },
-    { role: 'user', content: 'CALCULATOR RESULT (correct, do not recompute)\nProblem: $2x + 3 = 11$\nSteps: $2x - 8 = 0$ → $2x = 8$ → $x = 4$\nAnswer: $x = 4$\nExplain this to me.' },
-    { role: 'assistant', content: 'Una, ilipat natin ang constant: ibawas ang 3 sa both sides, kaya $2x = 8$. Tapos i-divide sa 2 para maiwan si x, kaya $x = 4$. Ganun lang kasimple!' },
-  ],
-  english: [
-    { role: 'user', content: 'How do I add fractions with the same denominator?' },
-    { role: 'assistant', content: 'Just add the numerators and keep the denominator the same. Example: $\\frac{1}{5} + \\frac{2}{5} = \\frac{3}{5}$. You got this!' },
-    { role: 'user', content: 'CALCULATOR RESULT (correct, do not recompute)\nProblem: $2x + 3 = 11$\nSteps: $2x - 8 = 0$ → $2x = 8$ → $x = 4$\nAnswer: $x = 4$\nExplain this to me.' },
-    { role: 'assistant', content: 'First, subtract 3 from both sides so we get $2x = 8$. Then divide both sides by 2 to get $x = 4$. Nice and easy!' },
-  ],
-}
-
 export function baseMessages(level: string, lang: AiLang): ChatMsg[] {
-  return [{ role: 'system', content: systemPrompt(level, lang) }, ...FEW_SHOT[lang]]
+  // No few-shot examples: small models copy them word-for-word. Grounding comes from the calculator steps instead.
+  return [{ role: 'system', content: systemPrompt(level, lang) }]
 }
 
 function questionContext(q: Question) {

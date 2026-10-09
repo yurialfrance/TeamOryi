@@ -38,7 +38,7 @@ export function Onboarding() {
 
       <div className="flex-1 overflow-y-auto px-5 pt-6 pb-4">
         <div className="flex items-end gap-3 mb-6">
-          <Pipo mood={step === 3 ? 'phone' : step === 1 ? 'think' : 'wave'} size={step === 0 ? 120 : 92} className="bob shrink-0" />
+          <Pipo mood={(['wave', 'think', 'calendar', 'phone'] as const)[step]} size={step === 0 ? 120 : 92} className="bob shrink-0" />
           <motion.div key={step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="relative mb-6 rounded-2xl border-2 border-line bg-white px-4 py-3 font-bold text-[17px] leading-snug">
             {bubble}

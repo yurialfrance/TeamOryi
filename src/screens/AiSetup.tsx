@@ -6,7 +6,8 @@ import { Icon } from '../components/Icon'
 
 /** Download / enable the on-device AI model */
 export function AiSetupCard({ compact = false }: { compact?: boolean }) {
-  const { aiModel, set } = useGame()
+  const { aiModel, set, aiLang } = useGame()
+  const en = aiLang === 'english'
   const ai = useAi()
   const [gpu, setGpu] = useState<boolean | null>(null)
   const [cached, setCached] = useState<Record<string, boolean>>({})
@@ -32,13 +33,12 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
       {gpu === false && (
         <div className="rounded-2xl bg-sun-soft border-2 border-sun p-3 text-[14px] font-semibold flex gap-2">
           <Icon name="chip" size={26} />
-          <span>Walang WebGPU ang browser na ito, kaya gagamitin ang <b>CPU mode</b>. Gagana pa rin offline, pero mas mabagal sumagot.</span>
+          <span>{en ? <>This browser has no WebGPU, so Pipo will use <b>CPU mode</b>. Still works offline, just slower.</> : <>Walang WebGPU ang browser na ito, kaya gagamitin ang <b>CPU mode</b>. Gagana pa rin offline, pero mas mabagal sumagot.</>}</span>
         </div>
       )}
       {!compact && (
         <div className="rounded-2xl bg-leaf-soft p-4 font-semibold text-[15px] flex gap-3">
-          <Icon name="chip" size={36} /><span>Ang AI ay tumatakbo <b>sa device mo mismo</b> (WebLLM + WebGPU). Isang beses lang i-download, tapos gagana na kahit offline. Walang
-          account, walang data na pinapadala sa internet.</span>
+          <Icon name="chip" size={36} /><span>{en ? <>The AI runs <b>on your device</b>. Download once, then it works offline. No account, no data sent to the internet.</> : <>Ang AI ay tumatakbo <b>sa device mo mismo</b>. Isang beses lang i-download, tapos gagana na kahit offline. Walang account, walang data na pinapadala sa internet.</>}</span>
         </div>
       )}
       <div className="grid gap-2">
@@ -48,9 +48,9 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
             style={{ ['--shadow' as string]: aiModel === m.id ? 'var(--color-leaf)' : '#E0D9E8' }}>
             <span>
               <span className="block font-black">{m.label}</span>
-              <span className="block text-sm text-ink-soft font-semibold">{m.note}</span>
+              <span className="block text-sm text-ink-soft font-semibold">{en ? m.noteEn : m.note}</span>
             </span>
-            <span className="text-sm font-black text-ink-soft">{cached[m.id] ? 'Naka-save' : m.size}</span>
+            <span className="text-sm font-black text-ink-soft">{cached[m.id] ? (en ? 'Saved' : 'Naka-save') : m.size}</span>
           </button>
         ))}
       </div>
@@ -60,15 +60,15 @@ export function AiSetupCard({ compact = false }: { compact?: boolean }) {
           <div className="text-xs font-bold text-ink-soft line-clamp-2">{Math.round(ai.progress * 100)}% · {ai.progressText}</div>
         </div>
       ) : ai.status === 'ready' && ai.modelId === aiModel ? (
-        <div className="rounded-2xl bg-leaf-soft text-leaf-dark font-black p-3 flex items-center justify-center gap-2"><Icon name="shield" size={24} /> Handa na si Pipo AI{modelInfo(aiModel).backend === 'cpu' ? ' (CPU)' : ''} — 100% offline!</div>
+        <div className="rounded-2xl bg-leaf-soft text-leaf-dark font-black p-3 flex items-center justify-center gap-2"><Icon name="shield" size={24} /> {en ? 'Pipo AI is ready' : 'Handa na si Pipo AI'}{modelInfo(aiModel).backend === 'cpu' ? ' (CPU)' : ''} — 100% offline!</div>
       ) : (
         <Button tone="leaf" className="w-full" onClick={start}>
-          {cached[aiModel] ? 'I-load ang AI' : 'I-download ang AI'}
+          {cached[aiModel] ? (en ? 'Load the AI' : 'I-load ang AI') : (en ? 'Download the AI' : 'I-download ang AI')}
         </Button>
       )}
       {ai.status === 'error' && (
         <div className="text-heart font-bold text-sm">
-          {/fetch|network|Load failed/i.test(ai.error ?? '') ? 'Hindi ma-download ang model — i-check ang internet connection at subukan ulit.' : `May error: ${ai.error}`}
+          {/fetch|network|Load failed/i.test(ai.error ?? '') ? (en ? 'Could not download the model — check your internet connection and try again.' : 'Hindi ma-download ang model — i-check ang internet connection at subukan ulit.') : `May error: ${ai.error}`}
         </div>
       )}
     </div>

@@ -122,7 +122,7 @@ any wrong result. All math in AI replies is rendered as real formulas.
 | Styling / motion | Tailwind CSS v4, Motion, canvas-confetti, Nunito |
 | Math input & rendering | MathLive (custom keyboard) |
 | Math engine | @cortex-js/compute-engine |
-| Local AI | @mlc-ai/web-llm (Web Worker), Qwen2.5-1.5B / 0.5B Instruct (q4f16) |
+| Local AI | @mlc-ai/web-llm (WebGPU) · @wllama/wllama (llama.cpp WASM, CPU fallback) · Qwen2.5-Instruct 1.5B / 0.5B |
 | State | Zustand + localStorage |
 | Offline / install | vite-plugin-pwa (Workbox) |
 | Hosting | GitHub Pages via GitHub Actions |
@@ -158,7 +158,8 @@ Official MATATAG / SHS / CHED competency codes should be added against the publi
 ## AI tools disclosure (hackathon rule)
 
 - **Claude (Anthropic)** — used as an AI coding assistant to scaffold and write parts of this codebase
-- **WebLLM + Qwen2.5-Instruct** — the on-device model that powers Pipo's hints and tutor chat inside the app
+- **WebLLM + wllama (llama.cpp) + Qwen2.5-Instruct** — the on-device models that power Pipo's hints and tutor chat inside the app
+- **AI guardrails** — every AI reply is checked by code (`src/ai/guard.ts`); ungrounded numbers are replaced by the calculator's verified explanation
 - Open-source libraries listed in `package.json`
 
 All code was written during the hackathon window.

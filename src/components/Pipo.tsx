@@ -1,37 +1,34 @@
 import { useState } from 'react'
 
 export type Mood =
-  | 'wave' | 'think' | 'confused' | 'eureka' | 'jump' | 'thumbsup' | 'sad' | 'determined'
-  | 'flame' | 'trophy' | 'sleep' | 'tutor' | 'phone' | 'pat' | 'read' | 'oops'
+  | 'wave' | 'bow' | 'peek' | 'sign' | 'point' | 'phone' | 'think' | 'typing' | 'read' | 'confused' | 'eureka' | 'number'
+  | 'seesaw' | 'pizza' | 'piggybank' | 'sunflower' | 'jump' | 'thumbsup' | 'clap' | 'dance' | 'star' | 'sad' | 'oops'
+  | 'determined' | 'pat' | 'shrug' | 'flame' | 'medal' | 'coins' | 'trophy' | 'rocket' | 'heart' | 'sleep' | 'splash'
+  | 'backpack' | 'tutor' | 'calendar' | 'bye'
 
-/** Mood → final artwork file from the Pipo prompt sheet (drop PNGs into /public/pipo/) */
-const FILES: Record<Mood, string> = {
-  wave: 'pipo-01-wave', phone: 'pipo-06-phone', think: 'pipo-07-think', read: 'pipo-09-read',
-  confused: 'pipo-10-confused', eureka: 'pipo-11-eureka', jump: 'pipo-17-jump', thumbsup: 'pipo-18-thumbsup',
-  sad: 'pipo-22-sad', oops: 'pipo-23-oops', determined: 'pipo-24-determined', pat: 'pipo-25-pat',
-  flame: 'pipo-27-flame', trophy: 'pipo-30-trophy', sleep: 'pipo-33-sleep', tutor: 'pipo-36-tutor',
-}
-
+/** Team Oryi mascot art lives in /public/mascot/<mood>.webp (converted from the Canva SVGs) */
 const missing = new Set<string>()
 
 export function Pipo({ mood = 'wave', size = 120, className = '' }: { mood?: Mood; size?: number; className?: string }) {
-  const file = FILES[mood]
-  const [failed, setFailed] = useState(missing.has(file))
+  const [failed, setFailed] = useState(missing.has(mood))
   if (!failed) {
     return (
       <img
-        src={`${import.meta.env.BASE_URL}pipo/${file}.png`}
+        src={`${import.meta.env.BASE_URL}mascot/${mood}.webp`}
         width={size}
         height={size}
         alt="Pipo"
         draggable={false}
         className={`object-contain select-none ${className}`}
-        onError={() => { missing.add(file); setFailed(true) }}
+        onError={() => { missing.add(mood); setFailed(true) }}
       />
     )
   }
   return <PipoSvg mood={mood} size={size} className={className} />
 }
+
+/** Hexagon achievement badge art (falls back to null if missing) */
+export const BADGE_ART = new Set(['first', 'fire', 'perfect', 'chest', 'elem', 'jhs', 'college', 'scholar', 'shs'])
 
 /** Placeholder vector Pipo until the generated artwork arrives */
 export function PipoSvg({ mood, size, className = '' }: { mood: Mood; size: number; className?: string }) {

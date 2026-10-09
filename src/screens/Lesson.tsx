@@ -12,6 +12,9 @@ import { Button, ProgressBar } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { RichText } from '../components/RichText'
 import { verifyAiMath } from '../engine/solver'
+import { isGrounded } from '../ai/guard'
+import { shuffle } from '../engine/rand'
+import { aiReady as isAiReady } from '../ai/llm'
 import { sfx } from '../lib/sfx'
 import { hintMessages, stream, useAi, whyWrongMessages } from '../ai/llm'
 
@@ -21,9 +24,15 @@ const COMFORT = ['Okay lang, matututo tayo!', 'Muntik na!', 'Next time makukuha 
 type Phase = 'answer' | 'correct' | 'wrong'
 
 export function LessonScreen() {
-  const { stageId, hearts, loseHeart, finishLesson, go, pushHistory, level, aiLang } = useGame()
+  const { stageId, hearts, loseHeart, finishLesson, go, pushHistory, level, aiLang, practice, completed } = useGame()
   const found = stageId ? findStage(stageId) : null
-  const [queue, setQueue] = useState<Question[]>(() => (found ? buildLesson(found.stage) : []))
+  const [queue, setQueue] = useState<Question[]>(() => {
+    if (!found) return []
+    if (!practice) return buildLesson(found.stage)
+    // Practice: mix questions from finished stages of this world (or this stage) — no hearts lost
+    const pool = found.world.stages.filter((st) => completed[st.id] || st.id === found.stage.id)
+    return shuffle(pool.flatMap((st) => buildLesson(st).slice(0, 2))).slice(0, 6)
+  })
   const total = useMemo(() => queue.length, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [idx, setIdx] = useState(0)
   const [phase, setPhase] = useState<Phase>('answer')
@@ -49,7 +58,8 @@ export function LessonScreen() {
   if (import.meta.env.DEV) (window as unknown as { __q: Question }).__q = q
   const progress = correctCount / total
 
-  const mood: Mood = phase === 'correct' ? (combo >= 3 ? 'jump' : 'thumbsup') : phase === 'wrong' ? 'sad' : aiOpen ? 'eureka' : q.kind === 'input' ? 'think' : 'read'
+  const CHEER: Mood[] = ['jump', 'thumbsup', 'clap']
+  const mood: Mood = phase === 'correct' ? (combo >= 3 ? 'dance' : CHEER[idx % 3]) : phase === 'wrong' ? (idx % 2 ? 'oops' : 'sad') : aiOpen ? 'eureka' : q.kind === 'input' ? 'typing' : 'think'
 
   const answerDisplayLatex = (q: Question) =>
     q.kind === 'input' ? q.answers[0] : q.kind === 'choice' ? q.choices[q.correctIndex].latex ?? '' : ''
@@ -75,7 +85,7 @@ export function LessonScreen() {
       setPhase('wrong')
       setCombo(0)
       setMissed((s) => new Set(s).add(q.id))
-      loseHeart()
+      if (!practice) loseHeart()
       // Duolingo-style: missed questions come back at the end
       setQueue((qs) => [...qs, { ...q, id: q.id }])
     }
@@ -85,15 +95,15 @@ export function LessonScreen() {
     setAiOpen(null); setAiText(''); setHintNo(0); setNudge(null)
     const heartsLeft = useGame.getState().hearts
     const seconds = Math.round((Date.now() - start.current) / 1000)
-    if (heartsLeft <= 0 && phase === 'wrong') {
-      finishLesson({ stageId: stage.id, correct: firstTry.size, total, xp: correctCount * 5, seconds, failed: true, bestCombo })
+    if (!practice && heartsLeft <= 0 && phase === 'wrong') {
+      finishLesson({ stageId: stage.id, correct: firstTry.size, total, xp: correctCount * 5, seconds, failed: true, bestCombo, practice })
       return
     }
     if (idx + 1 >= queue.length) {
       const perfect = missed.size === 0
       const xp = total * 10 + (perfect ? 10 : 0)
       sfx.complete()
-      finishLesson({ stageId: stage.id, correct: firstTry.size, total, xp, seconds, failed: false, bestCombo })
+      finishLesson({ stageId: stage.id, correct: firstTry.size, total, xp: practice ? total * 5 : xp, seconds, failed: false, bestCombo, practice })
       return
     }
     setIdx(idx + 1)
@@ -110,7 +120,8 @@ export function LessonScreen() {
     setHintNo(n + 1)
     const fallback = q.hints[Math.min(n, q.hints.length - 1)]
     const out = await stream(hintMessages(level, q, n, aiLang), setAiText, fallback, 120)
-    setAiText(verifyAiMath(out).text)
+    const src = [q.prompt, q.latex ?? '', q.answerDisplay, ...q.solution, ...q.hints]
+    setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
   }
 
   const askWhy = async () => {
@@ -119,7 +130,8 @@ export function LessonScreen() {
     const fallback = `Ganito ang tamang paraan:\n${q.solution.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     const typed = q.kind === 'input' ? latex : q.kind === 'choice' ? (q.choices[value as number]?.latex ?? q.choices[value as number]?.text ?? '') : String(value)
     const out = await stream(whyWrongMessages(level, q, typed, aiLang), setAiText, fallback, 260)
-    setAiText(verifyAiMath(out).text)
+    const src = [q.prompt, q.latex ?? '', q.answerDisplay, typed, ...q.solution, ...q.hints]
+    setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
   }
 
   const quit = () => go('path')
@@ -132,7 +144,11 @@ export function LessonScreen() {
           <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 5l14 14M19 5 5 19" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
         </button>
         <ProgressBar value={progress} color={combo >= 3 ? 'var(--color-flame)' : world.color} height={18} />
-        <div className="flex items-center gap-1 font-black text-heart text-lg"><Icon name={hearts > 0 ? 'heart' : 'heartBroken'} size={28} />{hearts}</div>
+        {practice ? (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-heart-soft text-heart-dark text-[11px] font-black uppercase"><Icon name="heartPlus" size={20} /> Practice</div>
+        ) : (
+          <div className="flex items-center gap-1 font-black text-heart text-lg"><Icon name={hearts > 0 ? 'heart' : 'heartBroken'} size={28} />{hearts}</div>
+        )}
       </div>
       <AnimatePresence>
         {combo >= 2 && phase === 'correct' && (

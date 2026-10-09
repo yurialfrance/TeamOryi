@@ -1,7 +1,7 @@
 import { useGame } from '../store/game'
 import { WORLDS } from '../curriculum/worlds'
 import { ACHIEVEMENTS } from '../store/quests'
-import { Pipo } from '../components/Pipo'
+import { BADGE_ART, Pipo } from '../components/Pipo'
 import { BottomNav, Button, ProgressBar, TopStats } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import { AiSetupCard } from './AiSetup'
@@ -56,7 +56,7 @@ export function ProfileScreen() {
       <main className="flex-1 overflow-y-auto no-scrollbar">
         <div className="bg-sky-soft px-5 pt-5 pb-5 flex items-center gap-4 border-b-2 border-line">
           <div className="w-24 h-24 rounded-full bg-white border-4 border-sky flex items-center justify-center overflow-hidden">
-            <Pipo mood="thumbsup" size={84} />
+            <Pipo mood="medal" size={84} />
           </div>
           <div>
             <div className="text-2xl font-black">{s.name || 'Kaibigan'}</div>
@@ -92,7 +92,12 @@ export function ProfileScreen() {
                 const done = a.done(s)
                 return (
                   <div key={a.id} className="flex flex-col items-center text-center">
-                    <Badge icon={a.icon} color={a.color} done={done} />
+                    {BADGE_ART.has(a.id) ? (
+                      <img src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`} alt={a.title} width={76} height={76}
+                        className="w-[76px] h-[76px] object-contain" style={done ? undefined : { filter: 'grayscale(1)', opacity: 0.35 }} />
+                    ) : (
+                      <Badge icon={a.icon} color={a.color} done={done} />
+                    )}
                     <div className={`text-[13px] font-black leading-tight mt-1 ${done ? '' : 'text-ink-soft'}`}>{a.title}</div>
                     <div className="text-[11px] font-semibold text-ink-soft leading-tight">{a.desc}</div>
                   </div>

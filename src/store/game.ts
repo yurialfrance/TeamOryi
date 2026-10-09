@@ -25,6 +25,8 @@ export interface LessonResult {
   streakUp: boolean
   failed: boolean
   bestCombo: number
+  practice?: boolean
+  heartsEarned?: number
 }
 
 interface Persisted {
@@ -58,13 +60,14 @@ interface Persisted {
 interface Volatile {
   screen: Screen
   stageId: string | null
+  practice: boolean
   result: LessonResult | null
 }
 
 interface Actions {
   set: (p: Partial<Persisted & Volatile>) => void
   go: (screen: Screen) => void
-  startLesson: (stageId: string) => void
+  startLesson: (stageId: string, practice?: boolean) => void
   loseHeart: () => void
   refillHearts: () => void
   finishLesson: (r: Omit<LessonResult, 'streakUp'>) => void
@@ -110,11 +113,12 @@ export const useGame = create<Persisted & Volatile & Actions>()(
       ...initial,
       screen: 'onboarding',
       stageId: null,
+      practice: false,
       result: null,
 
       set: (p) => set(p),
       go: (screen) => set({ screen }),
-      startLesson: (stageId) => set({ stageId, screen: 'lesson', result: null }),
+      startLesson: (stageId, practice = false) => set({ stageId, practice, screen: 'lesson', result: null }),
       loseHeart: () => set((s) => ({ hearts: Math.max(0, s.hearts - 1) })),
       refillHearts: () => set({ hearts: MAX_HEARTS }),
 
@@ -140,7 +144,8 @@ export const useGame = create<Persisted & Volatile & Actions>()(
         const acc = r.total ? r.correct / r.total : 0
         const stars = r.failed ? 0 : acc === 1 ? 3 : acc >= 0.8 ? 2 : 1
         const prev = s.completed[r.stageId]
-        const completed = r.failed
+        const heartsEarned = r.practice ? Math.min(MAX_HEARTS - s.hearts, Math.ceil(r.correct / 2)) : 0
+        const completed = r.failed || r.practice
           ? s.completed
           : { ...s.completed, [r.stageId]: { stars: Math.max(stars, prev?.stars ?? 0), best: Math.max(acc, prev?.best ?? 0) } }
         set({
@@ -156,7 +161,8 @@ export const useGame = create<Persisted & Volatile & Actions>()(
           lastLessonDate: r.failed ? s.lastLessonDate : d,
           completed,
           activity: { ...s.activity, [d]: (s.activity[d] ?? 0) + r.xp },
-          result: { ...r, streakUp },
+          hearts: s.hearts + heartsEarned,
+          result: { ...r, streakUp, heartsEarned },
           screen: 'complete',
         })
       },
@@ -186,7 +192,7 @@ export const useGame = create<Persisted & Volatile & Actions>()(
       name: 'sipnayan-v1',
       partialize: (s) => {
         const out: Record<string, unknown> = {}
-        for (const [k, v] of Object.entries(s)) if (typeof v !== 'function' && !['screen', 'stageId', 'result'].includes(k)) out[k] = v
+        for (const [k, v] of Object.entries(s)) if (typeof v !== 'function' && !['screen', 'stageId', 'result', 'practice'].includes(k)) out[k] = v
         return out as Partial<Persisted>
       },
       onRehydrateStorage: () => (state) => {
