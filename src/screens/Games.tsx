@@ -53,6 +53,28 @@ export function GamesScreen() {
           <span className="text-white text-xl font-black shrink-0">→</span>
         </button>
 
+        {/* Sipnayan Nerdle (Daily Offline Math Wordle) */}
+        <button onClick={() => go('nerdle')}
+          className="w-full rounded-2xl p-4 mt-3 flex items-center gap-3 text-left shadow-[0_4px_0_rgba(70,25,130,.35)] active:translate-y-0.5 cursor-pointer transition hover:brightness-105"
+          style={{ background: 'linear-gradient(135deg,#7B3FC4,#2F6BFF)' }}>
+          <span className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+            <Icon name="puzzle" size={34} white />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-white font-black text-lg leading-tight">Sipnayan Nerdle</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-leaf text-white shadow-xs">Araw-araw</span>
+            </div>
+            <div className="text-white/95 text-xs font-bold mt-0.5 leading-snug">
+              Daily Offline Math Wordle · Hulaan ang nakatagong equation sa 6 na subok
+            </div>
+            <div className="text-white/80 text-[11px] font-bold mt-1">
+              May 8 (Klasik) at 6 (Mini) tiles · May Daily Puzzle at Pagsasanay
+            </div>
+          </div>
+          <span className="text-white text-xl font-black shrink-0">→</span>
+        </button>
+
         <div className="rounded-2xl border-2 border-dashed border-line p-4 mt-4 flex items-center gap-3 opacity-70">
           <span className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: world.soft }}>
             <Icon name="lock" size={28} />

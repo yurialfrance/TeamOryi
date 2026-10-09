@@ -11,6 +11,7 @@ import { QuestsScreen } from './screens/Quests'
 import { GamesScreen } from './screens/Games'
 import { DuelScreen } from './screens/Duel'
 import { CashierSimulatorScreen } from './screens/CashierSimulator'
+import { NerdleScreen } from './screens/Nerdle'
 import { bestModelFor, isModelCached, loadModel } from './ai/llm'
 import { setMuted } from './lib/sfx'
 import { IconGallery } from './components/IconGallery'
@@ -41,6 +42,7 @@ export default function App() {
         {screen === 'games' && <GamesScreen />}
         {screen === 'duel' && <DuelScreen />}
         {screen === 'cashier' && <CashierSimulatorScreen />}
+        {screen === 'nerdle' && <NerdleScreen />}
       </div>
     </div>
   )

@@ -11,7 +11,7 @@ const yesterday = () => {
   return d.toLocaleDateString('en-CA')
 }
 
-export type Screen = 'onboarding' | 'path' | 'learn' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests' | 'games' | 'duel' | 'cashier'
+export type Screen = 'onboarding' | 'path' | 'learn' | 'lesson' | 'complete' | 'tutor' | 'profile' | 'quests' | 'games' | 'duel' | 'cashier' | 'nerdle'
 
 export const REFILL_COST = 30
 export const CHEST_GEMS = 20
@@ -57,6 +57,10 @@ interface Persisted {
   lessonsDone: number
   duelWins: number
   duelsPlayed: number
+  nerdleStreak: number
+  nerdleLastDate: string | null
+  nerdleWins: number
+  nerdlePlayed: number
 }
 
 interface Volatile {
@@ -111,6 +115,10 @@ const initial: Persisted = {
   lessonsDone: 0,
   duelWins: 0,
   duelsPlayed: 0,
+  nerdleStreak: 0,
+  nerdleLastDate: null,
+  nerdleWins: 0,
+  nerdlePlayed: 0,
 }
 
 export const useGame = create<Persisted & Volatile & Actions>()(
