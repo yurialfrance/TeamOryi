@@ -9,6 +9,7 @@ import { Icon, type IconName } from '../components/Icon'
 import { AiSetupCard } from './AiSetup'
 import { setMuted } from '../lib/sfx'
 import { stopSpeaking } from '../lib/tts'
+import { exportBackupString, importBackupString } from '../store/backup'
 
 type ProfileSubpage = 'main' | 'settings' | 'achievements' | 'curriculum' | 'ai'
 
@@ -145,6 +146,7 @@ function MenuCard({
 export function ProfileScreen() {
   const s = useGame()
   const [page, setPage] = useState<ProfileSubpage>('main')
+  const [backupStatus, setBackupStatus] = useState<string | null>(null)
 
   const stagesDone = Object.keys(s.completed).length
   const stars = Object.values(s.completed).reduce((a, c) => a + c.stars, 0)
@@ -386,6 +388,50 @@ export function ProfileScreen() {
                         <span className="text-[11px] text-ink-soft font-bold">XP/araw</span>
                       </button>
                     ))}
+                  </div>
+                </section>
+
+                {/* Defensive Backup & Restore */}
+                <section className="space-y-2">
+                  <h2 className="text-sm font-black text-ink-soft uppercase tracking-wider">Ligtas na Backup at Restore</h2>
+                  <div className="p-4 rounded-2xl border-2 border-line bg-white space-y-3">
+                    <p className="text-xs font-semibold text-ink-soft leading-relaxed">
+                      Protektado ng <b>SHA-256 cryptographic checksum</b> at <b>strict schema validation</b> upang matiyak na ligtas at hindi corrupted o injected ang iyong offline data.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        tone="white"
+                        className="flex-1 !text-xs !py-2"
+                        onClick={async () => {
+                          const code = await exportBackupString()
+                          try {
+                            await navigator.clipboard.writeText(code)
+                            setBackupStatus('Nai-kopya sa clipboard ang backup code! 📋')
+                          } catch {
+                            prompt('Kopyahin ang iyong backup code:', code)
+                          }
+                        }}
+                      >
+                        I-export ang Backup
+                      </Button>
+                      <Button
+                        tone="white"
+                        className="flex-1 !text-xs !py-2"
+                        onClick={async () => {
+                          const input = prompt('I-paste ang iyong Sipnayan backup code:')
+                          if (!input) return
+                          const res = await importBackupString(input)
+                          setBackupStatus(res.message)
+                        }}
+                      >
+                        I-import ang Backup
+                      </Button>
+                    </div>
+                    {backupStatus && (
+                      <div className="text-xs font-bold text-sky bg-sky-soft p-2.5 rounded-xl border border-sky/30">
+                        {backupStatus}
+                      </div>
+                    )}
                   </div>
                 </section>
 
