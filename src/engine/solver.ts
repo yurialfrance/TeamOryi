@@ -156,23 +156,79 @@ export function solveLatex(latex: string): CalcResult {
 }
 
 /**
- * Safety net: find simple numeric equalities inside $...$ in the AI's text and fix any wrong result.
- * e.g. "$12 \times 4 = 46$" → "$12 \times 4 = 48$"
+ * Deterministic Math Guardrail ("Code Computes, AI Explains")
+ * Extracts and verifies every numerical equation and variable statement written
+ * in the AI's response against ground truth computation.
+ * If the model hallucinates a wrong number, the deterministic code catches and fixes it.
  */
-export function verifyAiMath(text: string): { text: string; fixed: number } {
+export function verifyAiMath(
+  text: string,
+  groundTruth?: string[] | { answer?: string; targetVar?: string }
+): { text: string; fixed: number; corrected: string[] } {
   let fixed = 0
-  const out = text.replace(/\$([^$]+)\$/g, (m, body: string) => {
+  const corrected: string[] = []
+
+  // Extract ground truth targets if provided
+  let expectedVarVal: { varName: string; val: string } | null = null
+  let expectedAnswer: string | null = null
+  if (Array.isArray(groundTruth)) {
+    for (const src of groundTruth) {
+      const m = src.match(/([a-zA-Z])\s*=\s*(-?\d+(?:\.\d+)?|\\frac\{[^}]+\}\{[^}]+\})/)
+      if (m) expectedVarVal = { varName: m[1], val: m[2] }
+      else if (/^-?\d+(?:\.\d+)?$/.test(src.trim()) || /\\frac\{/.test(src)) expectedAnswer = src.trim()
+    }
+  } else if (groundTruth) {
+    if (groundTruth.answer) expectedAnswer = groundTruth.answer.trim()
+    if (groundTruth.targetVar && groundTruth.answer) {
+      expectedVarVal = { varName: groundTruth.targetVar, val: groundTruth.answer.trim() }
+    }
+  }
+
+  // 1. Verify formulas inside $...$
+  let out = text.replace(/\$([^$]+)\$/g, (m, body: string) => {
     const sides = body.split('=')
-    if (sides.length !== 2 || /[a-zA-Z](?<!\\[a-zA-Z]*)/.test(body.replace(/\\[a-zA-Z]+/g, ''))) return m
+    if (sides.length !== 2) return m
+
+    const left = sides[0].trim()
+    const right = sides[1].trim()
+
+    // Variable check against ground truth: e.g. $x = 6$ when expected is $x = 4$
+    const varMatch = left.match(/^([a-zA-Z])$/)
+    if (varMatch && expectedVarVal && varMatch[1].toLowerCase() === expectedVarVal.varName.toLowerCase()) {
+      if (right !== expectedVarVal.val) {
+        fixed++
+        corrected.push(`$${left} = ${right}$ → $${left} = ${expectedVarVal.val}$`)
+        return `$${left} = ${expectedVarVal.val}$`
+      }
+      return m
+    }
+
+    // Pure numerical expression check: e.g. $12 \times 4 = 46$ or $\frac{1}{2} + \frac{1}{3} = \frac{2}{5}$
+    if (/[a-zA-Z](?<!\\[a-zA-Z]*)/.test(body.replace(/\\[a-zA-Z]+/g, ''))) return m
     try {
-      const L = ce.parse(sides[0]).N().re
-      const R = ce.parse(sides[1]).N().re
+      const L = ce.parse(left).N().re
+      const R = ce.parse(right).N().re
       if (typeof L === 'number' && typeof R === 'number' && Number.isFinite(L) && Math.abs(L - R) > 1e-6 * Math.max(1, Math.abs(L))) {
         fixed++
-        return `$${sides[0].trim()} = ${numTex(L)}$`
+        const fixedTex = `$${left} = ${numTex(L)}$`
+        corrected.push(`${m} → ${fixedTex}`)
+        return fixedTex
       }
     } catch { /* ignore */ }
     return m
   })
-  return { text: out, fixed }
+
+  // 2. Safety check: if ground truth answer was given and AI asserted a different final answer
+  if (expectedAnswer) {
+    out = out.replace(/(?:ang sagot ay|sagot:\s*|answer is\s*|kaya\s*|so\s*)\$(-?\d+(?:\.\d+)?)\$/gi, (m, numVal: string) => {
+      if (expectedAnswer && numVal !== expectedAnswer && /^-?\d+(?:\.\d+)?$/.test(expectedAnswer)) {
+        fixed++
+        corrected.push(`${m} → (corrected to $${expectedAnswer}$)`)
+        return m.replace(`$${numVal}$`, `$${expectedAnswer}$`)
+      }
+      return m
+    })
+  }
+
+  return { text: out, fixed, corrected }
 }
