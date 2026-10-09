@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import "@fontsource-variable/nunito";
+@import "mathlive/fonts.css";
+@import "mathlive/static.css";
+
+@theme {
+  --font-sans: "Nunito Variable", "Nunito", system-ui, sans-serif;
+
+  --color-ink: #3C3346;
+  --color-ink-soft: #7A6F85;
+  --color-line: #E8E2EE;
+  --color-paper: #FFFFFF;
+  --color-cloud: #F7F4FA;
+
+  --color-sky: #2F6BFF;      /* primary — flag blue */
+  --color-sky-dark: #1F4FD1;
+  --color-sky-soft: #E6EEFF;
+
+  --color-sun: #FFC83D;      /* XP / gold */
+  --color-sun-dark: #E5A800;
+  --color-sun-soft: #FFF6DA;
+
+  --color-heart: #FF4B6E;    /* hearts / errors */
+  --color-heart-dark: #D93355;
+  --color-heart-soft: #FFE6EC;
+
+  --color-leaf: #3DBE6B;     /* correct */
+  --color-leaf-dark: #2A9A51;
+  --color-leaf-soft: #E3F8EA;
+
+  --color-pig: #FF8FB1;      /* Pipo pink */
+  --color-pig-dark: #E46A92;
+  --color-pig-soft: #FFE9F0;
+
+  --color-flame: #FF8A1F;
+  --color-grape: #9B5DE5;
+  --color-grape-dark: #7B3FC4;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-cloud);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Chunky 3D buttons (Duolingo feel) */
+@utility btn3d {
+  position: relative;
+  border-radius: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transition: transform 80ms ease, box-shadow 80ms ease, filter 120ms;
+  box-shadow: 0 4px 0 var(--shadow, rgba(0,0,0,.18));
+  user-select: none;
+  &:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 var(--shadow, rgba(0,0,0,.18)); }
+  &:disabled { filter: grayscale(1); opacity: .55; }
+}
+
+/* MathLive field look */
+math-field {
+  font-size: 30px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 2px solid var(--color-line);
+  background: white;
+  outline: none;
+  --caret-color: var(--color-sky);
+  --selection-background-color: var(--color-sky-soft);
+  --contains-highlight-background-color: transparent;
+  --placeholder-color: var(--color-sky);
+  --placeholder-opacity: .35;
+}
+math-field:focus-within { border-color: var(--color-sky); }
+math-field::part(virtual-keyboard-toggle),
+math-field::part(menu-toggle) { display: none; }
+
+.latex-inline .ML__latex { font-size: 1.15em; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(47,107,255,.45); }
+  100% { box-shadow: 0 0 0 18px rgba(47,107,255,0); }
+}
+.pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
+
+@keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+.bob { animation: bob 2.4s ease-in-out infinite; }
+
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+.shake { animation: shake .4s ease; }
+
+@keyframes fadein { from { opacity: 0 } to { opacity: 1 } }
+@keyframes sheetup { from { transform: translateY(100%) } to { transform: translateY(0) } }
+@keyframes wiggle { 0%,100% { transform: rotate(0) } 25% { transform: rotate(-8deg) } 75% { transform: rotate(8deg) } }
+.wiggle { animation: wiggle .9s ease-in-out infinite; }
+@keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+.float { animation: float 2s ease-in-out infinite; }
+
+/* Dotted path between nodes (Duolingo-style trail) */
+.trail { background-image: radial-gradient(circle, #E5E0EA 3px, transparent 3.5px); background-size: 12px 14px; background-repeat: repeat-y; background-position: center; }
