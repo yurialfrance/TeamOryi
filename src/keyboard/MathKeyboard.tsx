@@ -25,6 +25,7 @@ const TAB_LABEL: Record<KeyboardTab, React.ReactNode> = {
   basic: <span className="leading-[0.95] text-[13px] font-black tracking-wider text-center block">1 2<br />= +</span>,
   algebra: <span className="text-lg font-black italic">x²</span>,
   advanced: <span className="text-lg font-black italic">ƒ π</span>,
+  calculus: <span className="text-[15px] font-black">∫ dx</span>,
   abc: <span className="text-sm font-black">abc</span>,
   quick: <Icon name="bolt" size={24} />,
 }
@@ -68,6 +69,7 @@ function Key({ k, onKey }: { k: KeyDef; onKey: (k: KeyDef) => void }) {
   return (
     <button
       type="button"
+      aria-label={k.label ?? k.tex}
       onPointerDown={(e) => { e.preventDefault(); start() }}
       onPointerUp={() => end(true)}
       onPointerLeave={() => pressed && end(false)}
@@ -125,7 +127,7 @@ export function MathKeyboard({ tabs, onKey, onAction, actionLabel = 'CHECK', act
             key={t}
             type="button"
             onPointerDown={(e) => { e.preventDefault(); setTab(t) }}
-            className={`relative w-16 h-11 flex items-center justify-center transition-colors ${tab === t ? 'text-sky' : 'text-ink-soft'}`}
+            className={`relative flex-1 min-w-0 max-w-16 h-11 flex items-center justify-center transition-colors ${tab === t ? 'text-sky' : 'text-ink-soft'}`}
           >
             {TAB_LABEL[t]}
             <span className={`absolute bottom-0 left-2 right-2 h-[3px] rounded-full transition-all ${tab === t ? 'bg-sky' : 'bg-transparent'}`} />

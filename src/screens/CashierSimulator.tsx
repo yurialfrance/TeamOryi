@@ -1,200 +1,20 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import confetti from 'canvas-confetti'
 import { useGame } from '../store/game'
 import { Button } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { Pipo } from '../components/Pipo'
+import { ReportSheet } from '../components/ReportSheet'
 import { haptic, sfx } from '../lib/sfx'
-
-type CashierMode = 'easy' | 'medium' | 'hard'
-
-interface Denom {
-  id: string
-  label: string
-  cents: number // In centavos (100 = ₱1.00)
-  type: 'bill' | 'coin'
-  bg: string
-  border: string
-  textColor: string
-  accent?: string
-}
-
-const DENOMINATIONS: Denom[] = [
-  // Bills
-  { id: 'b1000', label: '₱1,000', cents: 100000, type: 'bill', bg: '#1E58A4', border: '#143C70', textColor: '#FFFFFF', accent: '#6FA4E8' },
-  { id: 'b500', label: '₱500', cents: 50000, type: 'bill', bg: '#CCA01A', border: '#8A6A0B', textColor: '#FFFFFF', accent: '#FFE885' },
-  { id: 'b200', label: '₱200', cents: 20000, type: 'bill', bg: '#238A4B', border: '#175E33', textColor: '#FFFFFF', accent: '#7CE5A4' },
-  { id: 'b100', label: '₱100', cents: 10000, type: 'bill', bg: '#6B3FA0', border: '#46276B', textColor: '#FFFFFF', accent: '#C8A4F8' },
-  { id: 'b50', label: '₱50', cents: 5000, type: 'bill', bg: '#C5374C', border: '#882231', textColor: '#FFFFFF', accent: '#FFA6B3' },
-  { id: 'b20', label: '₱20', cents: 2000, type: 'bill', bg: '#D36A26', border: '#924615', textColor: '#FFFFFF', accent: '#FFB885' },
-  // Coins
-  { id: 'c20', label: '₱20', cents: 2000, type: 'coin', bg: '#C4943E', border: '#9E7428', textColor: '#3C3346', accent: '#E8E3EE' },
-  { id: 'c10', label: '₱10', cents: 1000, type: 'coin', bg: '#C0BAC6', border: '#8F8798', textColor: '#3C3346', accent: '#D8AA48' },
-  { id: 'c5', label: '₱5', cents: 500, type: 'coin', bg: '#C8C4CE', border: '#96909E', textColor: '#3C3346' },
-  { id: 'c1', label: '₱1', cents: 100, type: 'coin', bg: '#DDD9E2', border: '#ABA4B4', textColor: '#3C3346' },
-  { id: 'c025', label: '25¢', cents: 25, type: 'coin', bg: '#D4A234', border: '#96711E', textColor: '#3C3346' },
-]
+import { DENOMINATIONS, formatPeso, generateOrder, type CashierMode, type CustomerOrder, type Denom } from '../games/cashier'
 
 const DENOM_MAP = new Map(DENOMINATIONS.map((d) => [d.id, d]))
-
-function formatPeso(cents: number): string {
-  const p = (cents / 100).toFixed(2)
-  const [whole, dec] = p.split('.')
-  const formattedWhole = parseInt(whole, 10).toLocaleString('en-PH')
-  return `₱${formattedWhole}.${dec}`
-}
-
-interface StoreItem {
-  id: string
-  name: string
-  cents: number
-  emoji: string
-  wholeOnly?: boolean
-}
-
-const ITEMS: StoreItem[] = [
-  { id: 'canton', name: 'Pancit Canton', cents: 1800, emoji: '🍜', wholeOnly: true },
-  { id: 'coke', name: 'Coke Mismo', cents: 1600, emoji: '🥤', wholeOnly: true },
-  { id: 'itlog', name: 'Sariwang Itlog', cents: 850, emoji: '🥚' },
-  { id: 'kape', name: '3-in-1 Kape', cents: 975, emoji: '☕' },
-  { id: 'biskwit', name: 'Rebisco Crackers', cents: 700, emoji: '🍪', wholeOnly: true },
-  { id: 'asukal', name: 'Asukal (1 pouch)', cents: 1525, emoji: '🧂' },
-  { id: 'mantika', name: 'Mantika (tingi)', cents: 1250, emoji: '🍶' },
-  { id: 'kendi', name: 'Maxx Candy (3 pcs)', cents: 300, emoji: '🍬', wholeOnly: true },
-  { id: 'sabon', name: 'Tide Sabon Panlaba', cents: 2450, emoji: '🧼' },
-  { id: 'bigas', name: 'Bigas (1 kilo)', cents: 5200, emoji: '🌾', wholeOnly: true },
-  { id: 'chichirya', name: 'Chichirya', cents: 1050, emoji: '🍿' },
-  { id: 'pandesal', name: 'Pandesal (5 pcs)', cents: 1500, emoji: '🥖', wholeOnly: true },
-  { id: 'sardinas', name: '555 Sardinas', cents: 2200, emoji: '🐟', wholeOnly: true },
-  { id: 'noodles', name: 'Instant Mami', cents: 1400, emoji: '🍲', wholeOnly: true },
-]
-
-const CUSTOMER_NAMES = [
-  'Nanay Rosa', 'Carlo', 'Maria', 'Mang Jose', 'Ate Bea',
-  'Kuya Ben', 'Aling Tess', 'Jomar', 'Lola Remedios', 'Totoy',
-]
-
-interface OrderItem {
-  item: StoreItem
-  qty: number
-}
-
-interface CustomerOrder {
-  customerName: string
-  items: OrderItem[]
-  totalCents: number
-  paidCents?: number
-  targetCents: number
-  mode: CashierMode
-  instruction: string
-}
-
-function generateOrder(mode: CashierMode): CustomerOrder {
-  const name = CUSTOMER_NAMES[Math.floor(Math.random() * CUSTOMER_NAMES.length)]
-
-  if (mode === 'easy') {
-    // Whole numbers & Exact payment (e.g. ₱15, ₱25, ₱38, ₱52)
-    const pool = ITEMS.filter((it) => it.wholeOnly)
-    const chosen1 = pool[Math.floor(Math.random() * pool.length)]
-    const chosen2 = Math.random() > 0.4 ? pool[Math.floor(Math.random() * pool.length)] : null
-
-    const items: OrderItem[] = [{ item: chosen1, qty: 1 }]
-    if (chosen2 && chosen2.id !== chosen1.id) {
-      items.push({ item: chosen2, qty: 1 })
-    }
-
-    const totalCents = items.reduce((sum, it) => sum + it.item.cents * it.qty, 0)
-    return {
-      customerName: name,
-      items,
-      totalCents,
-      targetCents: totalCents,
-      mode,
-      instruction: `Bumili si ${name} ng halagang ${formatPeso(totalCents)}. Magbabayad siya ng eksakto. Ilapag ang tamang bills at barya sa counter!`,
-    }
-  }
-
-  if (mode === 'medium') {
-    // Giving change (Whole numbers)
-    const pool = ITEMS.filter((it) => it.wholeOnly)
-    const chosen1 = pool[Math.floor(Math.random() * pool.length)]
-    const chosen2 = Math.random() > 0.5 ? pool[Math.floor(Math.random() * pool.length)] : null
-
-    const items: OrderItem[] = [{ item: chosen1, qty: 1 }]
-    if (chosen2 && chosen2.id !== chosen1.id) {
-      items.push({ item: chosen2, qty: 1 })
-    }
-
-    const totalCents = items.reduce((sum, it) => sum + it.item.cents * it.qty, 0)
-
-    // Pick appropriate paying bill
-    let paidCents = 5000 // ₱50
-    if (totalCents > 19000) {
-      paidCents = 50000 // ₱500
-    } else if (totalCents > 9000) {
-      paidCents = 20000 // ₱200
-    } else if (totalCents > 4500) {
-      paidCents = 10000 // ₱100
-    } else if (totalCents > 1800) {
-      paidCents = 5000 // ₱50
-    } else {
-      paidCents = 2000 // ₱20
-    }
-
-    // Ensure paid bill is strictly greater than total
-    if (paidCents <= totalCents) {
-      paidCents = totalCents <= 5000 ? 10000 : 20000
-    }
-
-    const targetCents = paidCents - totalCents
-    return {
-      customerName: name,
-      items,
-      totalCents,
-      paidCents,
-      targetCents,
-      mode,
-      instruction: `Bumili si ${name} ng ${formatPeso(totalCents)}. Nagbayad siya ng ${formatPeso(paidCents)} bill. Ibigay ang eksaktong sukling ${formatPeso(targetCents)}!`,
-    }
-  }
-
-  // mode === 'hard': Decimals & Centavos
-  const decimalPool = ITEMS.filter((it) => !it.wholeOnly)
-  const chosen1 = decimalPool[Math.floor(Math.random() * decimalPool.length)]
-  const chosen2 = Math.random() > 0.3 ? ITEMS[Math.floor(Math.random() * ITEMS.length)] : null
-
-  const items: OrderItem[] = [{ item: chosen1, qty: 1 }]
-  if (chosen2 && chosen2.id !== chosen1.id) {
-    items.push({ item: chosen2, qty: 1 })
-  }
-
-  const totalCents = items.reduce((sum, it) => sum + it.item.cents * it.qty, 0)
-
-  let paidCents = 5000
-  if (totalCents > 9000) paidCents = 20000
-  else if (totalCents > 4500) paidCents = 10000
-  else if (totalCents > 1800) paidCents = 5000
-  else paidCents = 2000
-
-  if (paidCents <= totalCents) {
-    paidCents = totalCents <= 5000 ? 10000 : 20000
-  }
-
-  const targetCents = paidCents - totalCents
-  return {
-    customerName: name,
-    items,
-    totalCents,
-    paidCents,
-    targetCents,
-    mode,
-    instruction: `Bumili si ${name} ng ${formatPeso(totalCents)}. Nag-abot siya ng ${formatPeso(paidCents)} bill. Ilatag ang eksaktong sukli na may sentimo (${formatPeso(targetCents)})!`,
-  }
-}
+/** Pipo peso sprite (public/currency), or undefined → drawn as the styled chip (5¢ and 1¢ have no art yet) */
+const artSrc = (d: Denom) => (d.art ? `${import.meta.env.BASE_URL}currency/${d.art}.webp` : undefined)
 
 export function CashierSimulatorScreen() {
-  const { go, xp, todayXp, set: setGame } = useGame()
+  const { go, xp, todayXp, set: setGame, recordAttempt } = useGame()
   const [mode, setMode] = useState<CashierMode>('medium')
   const [order, setOrder] = useState<CustomerOrder>(() => generateOrder('medium'))
   const [placed, setPlaced] = useState<Record<string, number>>({})
@@ -203,6 +23,11 @@ export function CashierSimulatorScreen() {
   const [customersServed, setCustomersServed] = useState(0)
   const [totalSalesCents, setTotalSalesCents] = useState(0)
   const [activeTab, setActiveTab] = useState<'all' | 'bills' | 'coins'>('all')
+  const [reportOpen, setReportOpen] = useState(false)
+  // report data: one attempt per customer — correct = right on the first hand-over
+  const wrongTries = useRef(0)
+  const shownAt = useRef(Date.now())
+  const nextCustomer = (m: CashierMode) => { setOrder(generateOrder(m)); wrongTries.current = 0; shownAt.current = Date.now() }
 
   // Calculate current total placed on counter
   const placedCents = useMemo(() => {
@@ -247,7 +72,7 @@ export function CashierSimulatorScreen() {
     setMode(newMode)
     setPlaced({})
     setFeedback(null)
-    setOrder(generateOrder(newMode))
+    nextCustomer(newMode)
   }
 
   const handleCheckout = () => {
@@ -268,6 +93,7 @@ export function CashierSimulatorScreen() {
         origin: { y: 0.7 },
       })
 
+      recordAttempt('cashier', order.topic, wrongTries.current === 0, Date.now() - shownAt.current)
       setCustomersServed((prev) => prev + 1)
       setTotalSalesCents((prev) => prev + order.totalCents)
       setFeedback({ status: 'correct', msg: `Tumpak! Salamat suki! (+15 XP)` })
@@ -279,9 +105,10 @@ export function CashierSimulatorScreen() {
       setTimeout(() => {
         setPlaced({})
         setFeedback(null)
-        setOrder(generateOrder(mode))
+        nextCustomer(mode)
       }, 1200)
     } else if (diffCents > 0) {
+      wrongTries.current++
       sfx.wrong()
       haptic(25)
       setFeedback({
@@ -289,6 +116,7 @@ export function CashierSimulatorScreen() {
         msg: `Kulang pa ng ${formatPeso(diffCents)}! Magdagdag pa ng barya o bills.`,
       })
     } else {
+      wrongTries.current++
       sfx.wrong()
       haptic(25)
       setFeedback({
@@ -306,7 +134,7 @@ export function CashierSimulatorScreen() {
   }, [activeTab])
 
   return (
-    <div className="h-full flex flex-col bg-[#F7F5FA] relative select-none">
+    <div className="h-full flex flex-col bg-white relative select-none">
       {/* Top Navigation & Status Bar */}
       <header className="px-3 py-2 bg-white border-b-2 border-line flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -334,11 +162,16 @@ export function CashierSimulatorScreen() {
           <span className="px-2 py-1 rounded-xl bg-leaf-soft text-leaf-dark text-xs font-black border border-leaf/30">
             {formatPeso(totalSalesCents)}
           </span>
+          <button type="button" onClick={() => setReportOpen(true)} aria-label="Assessment Report"
+            className="w-8 h-8 rounded-xl bg-cloud border-2 border-line flex items-center justify-center active:scale-95 cursor-pointer">
+            <Icon name="chartUp" size={18} />
+          </button>
         </div>
+        <ReportSheet open={reportOpen} onClose={() => setReportOpen(false)} kind="cashier" />
       </header>
 
       {/* Main Game Stage */}
-      <main className="flex-1 overflow-y-auto no-scrollbar flex flex-col">
+      <main className="flex-1 overflow-y-auto no-scrollbar flex flex-col screen-bg" style={{ ['--screen-tint' as string]: '#FFE3C7' }}>
         {/* Sari-Sari Store Awning Banner */}
         <div className="h-4 w-full bg-[repeating-linear-gradient(45deg,#E03E3E,#E03E3E_16px,#FFFFFF_16px,#FFFFFF_32px)] border-b-2 border-[#B32424] shadow-xs" />
 
@@ -348,9 +181,9 @@ export function CashierSimulatorScreen() {
           <div className="grid grid-cols-3 gap-1.5 flex-1">
             {(
               [
-                ['easy', 'Tingi (Sakto)'],
-                ['medium', 'May Sukli'],
-                ['hard', 'Sentimo / Decimals'],
+                ['easy', 'Tingi-tingi'],
+                ['medium', 'Sukli Master'],
+                ['hard', 'Sentimo'],
               ] as [CashierMode, string][]
             ).map(([m, label]) => (
               <button
@@ -377,7 +210,7 @@ export function CashierSimulatorScreen() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="rounded-2xl border-2 border-line bg-white p-3.5 shadow-xs relative overflow-hidden"
+              className="card-soft rounded-2xl p-3.5 relative overflow-hidden"
             >
               {/* Customer Avatar & Heading */}
               <div className="flex items-center justify-between mb-2 pb-2 border-b border-line/60">
@@ -403,8 +236,8 @@ export function CashierSimulatorScreen() {
                     key={it.item.id}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-cloud border border-line text-xs font-bold text-ink"
                   >
-                    <span>{it.item.emoji}</span>
-                    <span>{it.item.name}</span>
+                    <Icon name={it.item.icon} size={18} />
+                    <span>{it.qty > 1 ? `${it.qty} × ` : ''}{it.item.name}</span>
                     <span className="font-black text-ink-soft">({formatPeso(it.item.cents)})</span>
                   </span>
                 ))}
@@ -414,7 +247,7 @@ export function CashierSimulatorScreen() {
               <div className="rounded-xl p-2.5 bg-sky-soft/60 border border-sky/30 flex items-start gap-2.5">
                 <Pipo mood="point" size={32} className="shrink-0 mt-0.5" />
                 <div className="text-xs font-bold text-ink leading-relaxed">
-                  {order.mode === 'easy' ? (
+                  {order.paidCents === undefined ? (
                     <>
                       Magbabayad si {order.customerName} ng sakto:{' '}
                       <span className="font-black text-sky-dark underline decoration-2">{formatPeso(order.targetCents)}</span>.
@@ -428,6 +261,7 @@ export function CashierSimulatorScreen() {
                       </span>
                       . Ibigay ang sukling{' '}
                       <span className="font-black text-leaf-dark underline decoration-2">{formatPeso(order.targetCents)}</span>!
+                      {order.paidNote && <span className="block mt-1 text-[11px] text-ink-soft">{order.paidNote}.</span>}
                     </>
                   )}
                 </div>
@@ -453,7 +287,7 @@ export function CashierSimulatorScreen() {
                 ? 'border-sky bg-sky-soft/40 ring-4 ring-sky/20 scale-[1.01]'
                 : diffCents === 0 && placedCents > 0
                 ? 'border-leaf bg-leaf-soft/20 shadow-md ring-2 ring-leaf/30'
-                : 'border-line/80 shadow-xs'
+                : 'border-line/80 shadow-[0_10px_22px_-14px_rgba(91,60,140,.30)]'
             }`}
           >
             {/* Counter Header & Live Tally */}
@@ -487,7 +321,7 @@ export function CashierSimulatorScreen() {
                   {placedCents === 0
                     ? `Target: ${formatPeso(order.targetCents)}`
                     : diffCents === 0
-                    ? '🎉 Tumpak! Sakto!'
+                    ? 'Tumpak! Sakto!'
                     : diffCents > 0
                     ? `Kulang ng ${formatPeso(diffCents)}`
                     : `Sobra ng ${formatPeso(Math.abs(diffCents))}`}
@@ -514,19 +348,28 @@ export function CashierSimulatorScreen() {
                       exit={{ scale: 0.8, opacity: 0 }}
                       type="button"
                       onClick={() => removeDenom(id)}
-                      className="group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 transition active:scale-95 shadow-xs cursor-pointer hover:border-heart hover:brightness-95"
-                      style={{
-                        backgroundColor: denom.type === 'bill' ? denom.bg : denom.bg,
-                        borderColor: denom.border,
-                        color: denom.textColor,
-                      }}
-                      title="Pindutin para ibalik sa kaha"
+                      className={artSrc(denom)
+                        ? 'group relative flex items-center gap-1 transition active:scale-95 cursor-pointer hover:brightness-95'
+                        : 'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 transition active:scale-95 shadow-xs cursor-pointer hover:border-heart hover:brightness-95'}
+                      style={artSrc(denom) ? undefined : { backgroundColor: denom.bg, borderColor: denom.border, color: denom.textColor }}
+                      title={`${denom.label} — pindutin para ibalik sa kaha`}
+                      aria-label={`${denom.label} ×${count}, pindutin para ibalik sa kaha`}
                     >
-                      <span className="font-black text-xs leading-none">{denom.label}</span>
-                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-black/25 text-white">
-                        ×{count}
-                      </span>
-                      <span className="text-[10px] text-white/80 opacity-0 group-hover:opacity-100 transition">✕</span>
+                      {artSrc(denom) ? (
+                        <>
+                          <img src={artSrc(denom)} alt="" draggable={false}
+                            className={`pointer-events-none drop-shadow-[0_2px_2px_rgba(60,40,90,.25)] ${denom.type === 'bill' ? 'h-9 w-auto' : 'h-10 w-10 object-contain'}`} />
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-ink/80 text-white">×{count}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-black text-xs leading-none">{denom.label}</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-black/25 text-white">
+                            ×{count}
+                          </span>
+                          <span className="opacity-0 group-hover:opacity-100 transition"><Icon name="close" size={12} /></span>
+                        </>
+                      )}
                     </motion.button>
                   )
                 })
@@ -565,14 +408,14 @@ export function CashierSimulatorScreen() {
                 className="w-full text-base font-black shadow-sm"
                 onClick={handleCheckout}
               >
-                {order.mode === 'easy' ? 'I-abot ang Bayad' : 'I-abot ang Sukli'} ({formatPeso(placedCents)})
+                {order.paidCents === undefined ? 'I-abot ang Bayad' : 'I-abot ang Sukli'} ({formatPeso(placedCents)})
               </Button>
             </div>
           </div>
         </div>
 
         {/* Kaha ng Pera (Cashier Drawer / Denominations Tray) */}
-        <div className="mt-auto bg-white border-t-2 border-line p-3.5 space-y-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.03)]">
+        <div className="mt-auto bg-white border-t-2 border-line rounded-t-3xl p-3.5 space-y-2.5 shadow-[0_-10px_24px_-12px_rgba(91,60,140,.22)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Icon name="coins" size={20} />
@@ -599,10 +442,15 @@ export function CashierSimulatorScreen() {
             </div>
           </div>
 
-          {/* Denominations Grid */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-0.5">
-            {visibleDenoms.map((d) => {
+          {/* Denominations: bills (wide tiles, 3 across) then coins (square tiles, 4 across) */}
+          {(['bill', 'coin'] as const).map((kind) => {
+            const group = visibleDenoms.filter((d) => d.type === kind)
+            if (!group.length) return null
+            return (
+          <div key={kind} className={`grid gap-2 pt-0.5 ${kind === 'bill' ? 'grid-cols-3' : 'grid-cols-4'}`}>
+            {group.map((d) => {
               const countOnCounter = placed[d.id] ?? 0
+              const art = artSrc(d)
               return (
                 <button
                   key={d.id}
@@ -612,18 +460,21 @@ export function CashierSimulatorScreen() {
                     e.dataTransfer.setData('text/plain', d.id)
                   }}
                   onClick={() => addDenom(d.id)}
-                  className={`relative p-2 rounded-xl border-2 flex flex-col items-center justify-center transition active:scale-95 hover:brightness-105 shadow-xs cursor-pointer select-none ${
-                    d.type === 'bill' ? 'h-14' : 'h-14 rounded-2xl'
-                  }`}
-                  style={{
-                    backgroundColor: d.bg,
-                    borderColor: d.border,
-                    color: d.textColor,
-                  }}
+                  className={
+                    art
+                      ? `relative flex items-center justify-center rounded-xl transition active:scale-95 hover:-translate-y-0.5 cursor-pointer select-none ${d.type === 'bill' ? 'h-14' : 'h-16 w-16 mx-auto'}`
+                      : `relative p-2 border-2 flex flex-col items-center justify-center transition active:scale-95 hover:brightness-105 shadow-xs cursor-pointer select-none h-14 w-14 my-1 rounded-full mx-auto`
+                  }
+                  style={art ? undefined : { backgroundColor: d.bg, borderColor: d.border, color: d.textColor }}
                   title={`I-drag o i-tap para ilagay ang ${d.label}`}
+                  aria-label={`${d.label}${d.type === 'coin' ? ' na barya' : ' na bill'}`}
                 >
-                  {/* Subtle Banknote / Coin Embellishment */}
-                  {d.type === 'bill' ? (
+                  {art && (
+                    <img src={art} alt="" draggable={false}
+                      className={`pointer-events-none max-h-full max-w-full object-contain drop-shadow-[0_3px_3px_rgba(60,40,90,.28)] ${d.type === 'bill' ? 'w-full' : 'h-full'}`} />
+                  )}
+                  {/* Styled chip for denominations without art (5¢, 1¢) */}
+                  {art ? null : d.type === 'bill' ? (
                     <div className="w-full flex items-center justify-between px-1 pointer-events-none">
                       <span className="text-[10px] font-black opacity-85">₱</span>
                       <span className="font-black text-sm tracking-wide">{d.label.replace('₱', '')}</span>
@@ -646,6 +497,8 @@ export function CashierSimulatorScreen() {
               )
             })}
           </div>
+            )
+          })}
 
           <div className="text-center text-[10px] font-bold text-ink-soft pt-1">
             Tip: Maaaring mag-drag & drop o i-tap ang barya/bill upang ilagay sa counter.

@@ -7,6 +7,8 @@ import { Pipo } from '../components/Pipo'
 import { Button } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import { sfx } from '../lib/sfx'
+import { completeEvents, pickLine, sayLines, stopVoice } from '../lib/voice'
+import { ACHIEVEMENTS } from '../store/quests'
 
 function useCountUp(to: number, delay = 0, ms = 900) {
   const [v, setV] = useState(0)
@@ -43,6 +45,14 @@ export function CompleteScreen() {
   const accTarget = result ? Math.round((result.correct / result.total) * 100) : 0
   const acc = useCountUp(accTarget, 450)
 
+  // Pipo reacts: "Perpektong aralin!" / "Stage complete!" (or a gentle "subukan ulit"), then a
+  // new badge ("Level up!") or a longer day streak ("Ayan na ang apoy!") — two lines at most
+  useEffect(() => {
+    if (!result) return
+    sayLines(completeEvents(result).map((e) => pickLine(e)), { after: result.failed ? 400 : 700 })
+    return () => stopVoice()
+  }, [result])
+
   useEffect(() => {
     if (!result || result.failed) return
     const colors = ['#FFC83D', '#2F6BFF', '#FF8FB1', '#3DBE6B', '#FF8A1F']
@@ -56,7 +66,7 @@ export function CompleteScreen() {
 
   if (result.failed) {
     return (
-      <div className="h-full flex flex-col bg-white px-6 pt-16 pb-8 text-center">
+      <div className="h-full flex flex-col bg-white px-6 pt-16 pb-8 text-center screen-bg">
         <Pipo mood="pat" size={170} className="mx-auto" />
         <div className="flex items-center justify-center gap-2 mt-4">
           <Icon name="heartBroken" size={36} />
@@ -77,7 +87,7 @@ export function CompleteScreen() {
 
   const perfect = result.correct === result.total
   return (
-    <div className="h-full flex flex-col bg-white px-6 pt-10 pb-8 text-center">
+    <div className="h-full flex flex-col bg-white px-6 pt-10 pb-8 text-center screen-bg" style={{ ['--screen-tint' as string]: '#FFE9B8' }}>
       <motion.div initial={{ scale: 0.4, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 12 }}>
         <Pipo mood={result.practice ? 'heart' : perfect ? 'star' : 'trophy'} size={180} className="mx-auto" />
       </motion.div>
@@ -99,6 +109,16 @@ export function CompleteScreen() {
       {result.bestCombo >= 3 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-4 inline-flex mx-auto items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF0E0] text-flame font-black">
           <Icon name="bolt" size={20} /> {result.bestCombo} sunod-sunod na tama!
+        </motion.div>
+      )}
+
+      {!!result.newBadges?.length && (
+        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8 }}
+          className="mt-4 rounded-2xl bg-sun-soft border-2 border-sun p-3 flex items-center justify-center gap-2 flex-wrap font-black text-sun-dark">
+          <Icon name="medal" size={26} /> Level up! Bagong badge:
+          {ACHIEVEMENTS.filter((a) => result.newBadges!.includes(a.id)).map((a) => (
+            <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-ink text-sm"><Icon name={a.icon} size={18} /> {a.title}</span>
+          ))}
         </motion.div>
       )}
 

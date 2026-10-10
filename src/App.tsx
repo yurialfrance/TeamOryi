@@ -13,7 +13,8 @@ import { DuelScreen } from './screens/Duel'
 import { CashierSimulatorScreen } from './screens/CashierSimulator'
 import { NerdleScreen } from './screens/Nerdle'
 import { bestModelFor, isModelCached, loadModel } from './ai/llm'
-import { setMuted } from './lib/sfx'
+import { onAudioUnlocked, setMuted } from './lib/sfx'
+import { say } from './lib/voice'
 import { IconGallery } from './components/IconGallery'
 
 export default function App() {
@@ -21,6 +22,15 @@ export default function App() {
 
   // Auto-load the on-device model if the learner already downloaded it
   useEffect(() => { setMuted(muted) }, [muted])
+
+  // Returning learner: Pipo greets them — on their first tap, since browsers block sound before one
+  useEffect(() => {
+    if (!useGame.getState().onboarded) return
+    const opened = Date.now()
+    onAudioUnlocked(() => {
+      if (useGame.getState().screen === 'path' && Date.now() - opened < 60_000) say('welcomeBack', { after: 250 })
+    })
+  }, [])
 
   useEffect(() => {
     if (aiEnabled) bestModelFor(aiModel).then(async (id) => { if (await isModelCached(id)) loadModel(id) })

@@ -1,6 +1,7 @@
 import type { IconName } from '../components/Icon'
+import type { TopicId } from './topics'
 
-export type KeyboardTab = 'history' | 'basic' | 'algebra' | 'advanced' | 'abc' | 'quick'
+export type KeyboardTab = 'history' | 'basic' | 'algebra' | 'advanced' | 'calculus' | 'abc' | 'quick'
 
 export type Visual =
   | { type: 'pizza'; num: number; den: number }
@@ -8,6 +9,16 @@ export type Visual =
   | { type: 'scale'; left: string; right: string }
   | { type: 'sequence'; items: (string | null)[] }
   | { type: 'scene'; icons: IconName[] }
+  /** analog clock face */
+  | { type: 'clock'; h: number; m: number }
+  /** single bar graph; values are read off the bars */
+  | { type: 'barGraph'; title: string; labels: string[]; values: number[]; unit?: string }
+  /** small data table (first row is the header) */
+  | { type: 'table'; rows: string[][] }
+  /** right triangle with optional side labels (legs a, b and hypotenuse c) and an optional marked angle */
+  | { type: 'rightTriangle'; a?: string; b?: string; c?: string; angle?: string }
+  /** regular polygon with n sides */
+  | { type: 'polygon'; sides: number; label?: string }
 
 export interface Choice {
   latex?: string
@@ -27,6 +38,11 @@ interface QuestionBase {
   solution: string[]
   /** Canonical correct answer as text (for display + AI prompt) */
   answerDisplay: string
+  /** Topic tag (set by buildLesson from the stage) — feeds the assessment reports */
+  topic?: TopicId
+  /** "Kwento ni Pipo" word problem: 'ai-story' = the on-device AI wrote the story (and it passed
+   *  validation); 'story-template' = the AI's story was rejected, so the code-written facts are shown */
+  origin?: 'ai-story' | 'story-template'
 }
 
 export interface ChoiceQuestion extends QuestionBase {

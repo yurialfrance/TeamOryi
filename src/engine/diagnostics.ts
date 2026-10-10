@@ -1,3 +1,4 @@
+import type { IconName } from '../components/Icon'
 // On-Device Misconception Diagnostic AI ("Bakit Mali Ako?")
 // Symbolically classifies learner mistakes into common pedagogical misconceptions.
 // 100% offline, zero external dependencies.
@@ -23,6 +24,8 @@ export interface MisconceptionReport {
   kind: MisconceptionKind
   title: string
   badge: string
+  /** hand-drawn icon shown before the badge text (no emoji in the UI) */
+  badgeIcon: IconName
   badgeBg: string
   badgeText: string
   taglishSummary: string
@@ -116,7 +119,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'pizza_chef_complement',
         title: 'Nabilang ang Natira! (Topped vs Natira)',
-        badge: '🍕 Baligtad na Bahagi',
+        badge: 'Baligtad na Bahagi',
+        badgeIcon: 'pizza',
         badgeBg: 'bg-orange-soft',
         badgeText: 'text-orange-dark',
         taglishSummary: `Nabilang mo ang natirang walang toppings (${userFrac.num} hiwa) imbes na ang may toppings (${target} hiwa).`,
@@ -146,7 +150,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'fraction_denominator_add',
         title: 'Bawal I-add ang Denominator!',
-        badge: '🍕 Fraction Trap',
+        badge: 'Fraction Trap',
+        badgeIcon: 'pizza',
         badgeBg: 'bg-heart-soft',
         badgeText: 'text-heart-dark',
         taglishSummary: `In-add mo ang ilalim: ${b} + ${d} = ${trapDen}. Sa fractions, BAWAL i-add ang ilalim nang diretso!`,
@@ -169,7 +174,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'exponent_as_multiply',
         title: 'Hindi Simpleng Multiply ang Exponent!',
-        badge: '⚡ Exponent Trap',
+        badge: 'Exponent Trap',
+        badgeIcon: 'bolt',
         badgeBg: 'bg-sun-soft',
         badgeText: 'text-ink',
         taglishSummary: `Na-multiply mo ang base sa power (${base} × ${exp} = ${trapVal}). Ang exponent ay pag-multiply ng sarili nang ${exp} beses!`,
@@ -200,7 +206,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'pemdas_inverted',
         title: 'PEMDAS Alert! Unahin ang Multiply/Divide',
-        badge: '⚠️ PEMDAS Rule',
+        badge: 'PEMDAS Rule',
+        badgeIcon: 'scanWarn',
         badgeBg: 'bg-flame/15',
         badgeText: 'text-flame',
         taglishSummary: `Inuna mong mag-${op1 === '+' ? 'plus' : 'minus'} (${a} ${op1} ${b}) bago mag-${isMult ? 'multiply' : 'divide'}! Sa PEMDAS, nauuna ang Multiplication & Division.`,
@@ -219,7 +226,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'inverted_fraction',
         title: 'Nabaligtad ang Fraction! (Reciprocal)',
-        badge: '🔄 Inverted',
+        badge: 'Inverted',
+        badgeIcon: 'swap',
         badgeBg: 'bg-sky-soft',
         badgeText: 'text-sky-dark',
         taglishSummary: `Nabaligtad ang numerator at denominator! Nasa itaas dapat ang ${targetFrac.num} at nasa ibaba ang ${targetFrac.den}.`,
@@ -237,7 +245,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
     return {
       kind: 'sign_reversal',
       title: 'Nalito sa Sign! (+ vs -)',
-      badge: '➕➖ Sign Error',
+      badge: 'Sign Error',
+        badgeIcon: 'plusMinus',
       badgeBg: 'bg-purple-100',
       badgeText: 'text-grape-dark',
       taglishSummary: `Muntik na! Tama ang numero pero ${expectedSign} dapat ang sign ng sagot.`,
@@ -255,7 +264,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'decimal_place_error',
         title: 'Decimal Place Alert! (Nalipat ang Tuldok)',
-        badge: '🎯 Decimal Error',
+        badge: 'Decimal Error',
+        badgeIcon: 'target',
         badgeBg: 'bg-leaf-soft',
         badgeText: 'text-leaf-dark',
         taglishSummary: `Tama ang mga tambal ng numero, pero naligaw ang decimal point o magnitude ng 10x!`,
@@ -275,7 +285,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'digit_transposition',
         title: 'Binaligtad na Numero! (Transposition)',
-        badge: '🔢 Baligtad Digits',
+        badge: 'Baligtad Digits',
+        badgeIcon: 'blocks',
         badgeBg: 'bg-amber-100',
         badgeText: 'text-amber-800',
         taglishSummary: `Nabaligtad ang mga digits mo: isinulat mo ang ${userNum} imbes na ${correctNum}!`,
@@ -292,7 +303,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
     return {
       kind: 'off_by_one',
       title: 'Sobrang Lapit! (Off by 1)',
-      badge: '🎯 Muntik Na!',
+      badge: 'Muntik Na!',
+        badgeIcon: 'target',
       badgeBg: 'bg-leaf-soft',
       badgeText: 'text-leaf-dark',
       taglishSummary: `Kulang o sobra ka lang ng isa (1)! Napakagandang subok.`,
@@ -310,7 +322,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
       return {
         kind: 'not_simplified',
         title: 'I-simplify sa Lowest Terms!',
-        badge: '✂️ Simplest Terms',
+        badge: 'Simplest Terms',
+        badgeIcon: 'puzzle',
         badgeBg: 'bg-sun-soft',
         badgeText: 'text-ink',
         taglishSummary: `Tama ang value ng fraction mo, ngunit kailangan itong i-reduce sa lowest terms sa pamamagitan ng pag-divide sa ${g}.`,
@@ -327,7 +340,8 @@ export function diagnoseMisconception(q: Question, userValue: unknown): Misconce
   return {
     kind: 'general_arithmetic',
     title: 'Bakit Mali Ako? (Hakbang ni Pipo)',
-    badge: '💡 Gabay ni Pipo',
+    badge: 'Gabay ni Pipo',
+        badgeIcon: 'bulb',
     badgeBg: 'bg-grape-soft',
     badgeText: 'text-grape-dark',
     taglishSummary: `Tingnan natin ang unang mahalagang hakbang: "${firstSolutionStep}".`,

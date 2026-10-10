@@ -40,6 +40,23 @@ export const LAYOUTS: Record<Exclude<KeyboardTab, 'history' | 'quick'>, KeyDef[]
     [t('a_n', 'a_{n}'), t('a_{n+1}', 'a_{n+1}'), t('F_n', 'F_{n}'), t('S_n', 'S_{n}'), k('r', 'r', 'var'), k('d', 'd', 'var'), k('∞', '\\infty', 'fn')],
     [k('(', '(', 'op'), k(')', ')', 'op'), t('x^n', '#@^{#?}'), t('\\frac{a}{b}', FRAC), k(',', ',', 'op'), k('=', '=', 'op'), k('≈', '\\approx', 'op')],
   ],
+  // 5 rows (one more than the other tabs) so integral bounds, limit points and coefficients can be
+  // typed without leaving the tab. Less common keys sit on long-press (y, |x|, the constant e).
+  calculus: [
+    [
+      t('\\frac{d}{dx}', '\\frac{d}{dx}\\left(#?\\right)', 'fn', t('\\frac{d^2}{dx^2}', '\\frac{d^2}{dx^2}\\left(#?\\right)')),
+      t('\\int', '\\int #?\\,dx', 'fn', t('\\int_a^b', '\\int_{#?}^{#?} #?\\,dx')),
+      t('\\lim', '\\lim_{x\\to #?} #?', 'fn', t('\\lim_{\\infty}', '\\lim_{x\\to\\infty} #?')),
+      t('\\Sigma', '\\sum_{#?}^{#?} #?'),
+      t('e^x', 'e^{#?}', 'fn', k('e', 'e', 'fn')),
+      t('\\ln', '\\ln(#?)', 'fn', t('\\log', '\\log(#?)')),
+      k('\u221e', '\\infty', 'fn'),
+    ],
+    [k('x', 'x', 'var', k('y', 'y', 'var')), t('x^n', '#@^{#?}', 'fn', t(`${SQ}^2`, '#@^{2}')), t(`\\sqrt{${SQ}}`, '\\sqrt{#?}', 'fn', t('|x|', '\\left|#?\\right|')), t('\\frac{a}{b}', FRAC), t('\\sin', '\\sin(#?)'), t('\\cos', '\\cos(#?)'), t('\\tan', '\\tan(#?)')],
+    [k('7', '7'), k('8', '8'), k('9', '9'), k('(', '(', 'op'), k(')', ')', 'op'), k('\u2192', '\\to ', 'op'), k('\u03c0', '\\pi', 'fn')],
+    [k('4', '4'), k('5', '5'), k('6', '6'), k('+', '+', 'op'), k('\u2212', '-', 'op'), k('dx', '\\,dx', 'var'), k('n', 'n', 'var')],
+    [k('1', '1'), k('2', '2'), k('3', '3'), k('0', '0'), k('.', '.', 'num'), k('=', '=', 'op'), k('\u00b7', '\\cdot', 'op')],
+  ],
   abc: [
     'abcdefg'.split('').map((c) => k(c, c, 'var')),
     'hijklmn'.split('').map((c) => k(c, c, 'var')),

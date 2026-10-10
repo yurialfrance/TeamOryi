@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { buildLesson, findStage } from '../curriculum/worlds'
 import type { Question } from '../engine/types'
@@ -12,22 +12,25 @@ import { Button, ProgressBar } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { RichText } from '../components/RichText'
 import { verifyAiMath } from '../engine/solver'
-import { isGrounded } from '../ai/guard'
+import { isGrounded, isLanguage, streamGate } from '../ai/guard'
 import { gcd, shuffle } from '../engine/rand'
 import { aiReady as isAiReady } from '../ai/llm'
 import { sfx } from '../lib/sfx'
-import { hintMessages, stream, useAi, whyWrongMessages } from '../ai/llm'
+import { generate, hintMessages, storyModelReady, stream, useAi, whyWrongMessages } from '../ai/llm'
+import { planWordProblems, StoryBuffer } from '../engine/word-problems/buffer'
 import { diagnoseMisconception, type MisconceptionReport } from '../engine/diagnostics'
 import { speakText, stopSpeaking } from '../lib/tts'
 import { Scratchpad } from '../components/Scratchpad'
+import { LINES, correctEvent, hintEvent, isFindX, preloadVoice, say, stopVoice, wrongEvent } from '../lib/voice'
+import { ACHIEVEMENTS } from '../store/quests'
 
-const PRAISE = ['Ang galing mo!', 'Tumpak!', 'Lodi!', 'Sakto!', 'Petmalu!', 'Galing-galing!']
+/** Shown when Pipo stays quiet (last heart lost — the results screen does the talking) */
 const COMFORT = ['Okay lang, matututo tayo!', 'Muntik na!', 'Next time makukuha mo na!']
 
 type Phase = 'answer' | 'correct' | 'wrong'
 
 export function LessonScreen() {
-  const { stageId, hearts, loseHeart, finishLesson, go, pushHistory, level, aiLang, practice, completed } = useGame()
+  const { stageId, hearts, loseHeart, finishLesson, go, pushHistory, aiLang, practice, completed, recordAttempt } = useGame()
   const found = stageId ? findStage(stageId) : null
   const [queue, setQueue] = useState<Question[]>(() => {
     if (!found) return []
@@ -54,9 +57,69 @@ export function LessonScreen() {
   const [diagnostic, setDiagnostic] = useState<MisconceptionReport | null>(null)
   const [speakingTarget, setSpeakingTarget] = useState<'why' | 'hint' | 'diag' | null>(null)
   const [scratchpadOpen, setScratchpadOpen] = useState(false)
+  /** the words Pipo says for this answer — shown in the feedback sheet too, so text and voice match */
+  const [feedbackLine, setFeedbackLine] = useState<string | null>(null)
+  const [wrongRun, setWrongRun] = useState(0)
   const start = useRef(Date.now())
+  const questionShown = useRef(0)
+  // Kwento ni Pipo: word problems the on-device AI writes in the background (see engine/word-problems)
+  const stories = useRef<StoryBuffer | null>(null)
+  const [storyStatus, setStoryStatus] = useState<{ pending: number; fresh: boolean }>({ pending: 0, fresh: false })
+  const queueRef = useRef(queue)
+  const idxRef = useRef(0)
+  queueRef.current = queue
+  idxRef.current = idx
   const mf = useRef<MathFieldHandle>(null)
   const aiReady = useAi((s) => s.status === 'ready')
+
+  // Kwento ni Pipo — up to 2 word problems for this lesson's topics, each replacing the next upcoming
+  // question (same topic preferred). With the 1.5B WebGPU model they're written in the background and
+  // validated (badge); on any other device the code-written story is used right away (no badge).
+  // Nothing waits on the AI: a story that isn't ready in time simply doesn't replace anything.
+  useEffect(() => {
+    if (!found) return
+    const grade = Number(/^Grade (\d+)$/.exec(found.world.level)?.[1] ?? NaN)
+    const plans = Number.isFinite(grade) ? planWordProblems(queueRef.current.map((x) => x.topic).filter((t): t is NonNullable<typeof t> => !!t), grade) : []
+    if (!plans.length) return
+    let freshTimer: ReturnType<typeof setTimeout> | undefined
+    const place = () => {
+      const buf = stories.current
+      if (!buf) return
+      let next = queueRef.current
+      for (let story = buf.peek(); story; story = buf.peek()) {
+        // only the lesson's own upcoming questions, never the one on screen or a review repeat
+        const open = next.map((_, j) => j).filter((j) => j > idxRef.current && j < total && !next[j].origin)
+        const j = open.find((k) => next[k].topic === story!.topic) ?? open[0]
+        if (j === undefined) break
+        buf.take()
+        next = next.map((x, k) => (k === j ? story! : x))
+        if (story.origin === 'ai-story') {
+          // "May bagong kwento si Pipo" only when the AI really wrote it
+          clearTimeout(freshTimer)
+          setStoryStatus((st) => ({ ...st, fresh: true }))
+          freshTimer = setTimeout(() => setStoryStatus((st) => ({ ...st, fresh: false })), 2600)
+        }
+      }
+      if (next !== queueRef.current) { queueRef.current = next; setQueue(next) }
+      setStoryStatus((st) => ({ ...st, pending: storyModelReady() ? buf.pending : 0 }))
+    }
+    const writes = storyModelReady()
+    const buf = new StoryBuffer(plans, grade, aiLang, writes ? (msgs, o) => generate(msgs, o) : null, place)
+    stories.current = buf
+    // the "Gumagawa si Pipo ng kwento…" chip only while the AI is actually writing
+    setStoryStatus({ pending: writes ? buf.pending : 0, fresh: false })
+    void buf.run()
+    return () => { buf.stop(); stories.current = null; clearTimeout(freshTimer) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Decode this lesson's feedback lines up front; an equation lesson opens with "nasaan si x?"
+  useEffect(() => {
+    questionShown.current = Date.now()
+    preloadVoice(['correct', 'correctFast', 'combo3', 'combo5', 'wrong', 'wrongRule', 'wrongSlip', 'wrongPersist'])
+    const first = queue[0]
+    if (found?.world.tabs.includes('algebra') && first && isFindX(first)) say('findX', { after: 600 })
+    return () => stopVoice()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSpeak = (text: string, target: 'why' | 'hint' | 'diag') => {
     if (speakingTarget === target) {
@@ -65,6 +128,7 @@ export function LessonScreen() {
       return
     }
     sfx.tap()
+    stopVoice()
     speakText(text, {
       onStart: () => setSpeakingTarget(target),
       onEnd: () => setSpeakingTarget(null),
@@ -99,8 +163,14 @@ export function LessonScreen() {
     if (v === 'notSimplest') { setNudge('Tama ang value! Pero i-simplify pa sa lowest terms.'); setShake((s) => s + 1); return }
     setNudge(null)
     if (q.kind === 'input' && latex) pushHistory(latex)
+    // first answer only (a missed question comes back at the end, but it is counted once, as wrong)
+    if (!missed.has(q.id) && q.topic) recordAttempt(`landas:${world.id}`, q.topic, v === 'correct', Date.now() - questionShown.current)
     if (v === 'correct') {
       sfx.correct()
+      // the chime is the instant signal; Pipo's line follows once it has rung
+      const event = correctEvent({ combo: combo + 1, firstTry: !missed.has(q.id), seconds: (Date.now() - questionShown.current) / 1000 })
+      setFeedbackLine(LINES[say(event, { after: 350 })].text)
+      setWrongRun(0)
       setPhase('correct')
       setCombo((c) => { setBestCombo((b) => Math.max(b, c + 1)); return c + 1 })
       setCorrectCount((c) => c + 1)
@@ -113,6 +183,10 @@ export function LessonScreen() {
       setMissed((s) => new Set(s).add(q.id))
       const diag = diagnoseMisconception(q, current)
       setDiagnostic(diag)
+      // after the "bwomp" + heart sound (380 ms); quiet when the last heart is gone
+      const event = wrongEvent({ heartsLeft: practice ? hearts : hearts - 1, practice, wrongRun: wrongRun + 1, misconception: diag.kind })
+      setFeedbackLine(event ? LINES[say(event, { after: 700 })].text : null)
+      setWrongRun((n) => n + 1)
       if (!practice) loseHeart()
       // Duolingo-style: missed questions come back at the end
       setQueue((qs) => [...qs, { ...q, id: q.id }])
@@ -123,6 +197,7 @@ export function LessonScreen() {
     stopSpeaking()
     setSpeakingTarget(null)
     setDiagnostic(null)
+    setFeedbackLine(null)
     setAiOpen(null); setAiText(''); setHintNo(0); setNudge(null)
     const heartsLeft = useGame.getState().hearts
     const seconds = Math.round((Date.now() - start.current) / 1000)
@@ -134,9 +209,13 @@ export function LessonScreen() {
       const perfect = missed.size === 0
       const xp = total * 10 + (perfect ? 10 : 0)
       sfx.complete()
+      const badgesBefore = ACHIEVEMENTS.filter((a) => a.done(useGame.getState())).map((a) => a.id)
       finishLesson({ stageId: stage.id, correct: firstTry.size, total, xp: practice ? total * 5 : xp, seconds, failed: false, bestCombo, practice })
+      const newBadges = ACHIEVEMENTS.filter((a) => a.done(useGame.getState()) && !badgesBefore.includes(a.id)).map((a) => a.id)
+      if (newBadges.length) useGame.setState((s) => ({ result: s.result && { ...s.result, newBadges } }))
       return
     }
+    questionShown.current = Date.now()
     setIdx(idx + 1)
     setPhase('answer')
     setValue(null)
@@ -149,10 +228,13 @@ export function LessonScreen() {
     setAiOpen('hint')
     setAiText('')
     setHintNo(n + 1)
+    if (n === 0) say(hintEvent(q)) // first hint for this question: Pipo leans in with a matching line
     const fallback = q.hints[Math.min(n, q.hints.length - 1)]
-    const out = await stream(hintMessages(level, q, n, aiLang), setAiText, fallback, 120)
+    const gate = streamGate(aiLang, setAiText) // wrong-language text never reaches the screen
+    const out = await stream(hintMessages(found.world.id, q, n, aiLang), gate.onText, fallback, 120)
     const src = [q.prompt, q.latex ?? '', q.answerDisplay, ...q.solution, ...q.hints]
-    setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
+    const ok = !isAiReady() || (!gate.blocked && isGrounded(out, src) && isLanguage(out, aiLang))
+    setAiText(ok ? verifyAiMath(out).text : fallback)
   }
 
   const askWhy = async () => {
@@ -167,13 +249,16 @@ export function LessonScreen() {
           : q.kind === 'pizzaChef' && value && typeof value === 'object' && 'num' in value
             ? `${(value as { num: number; den: number }).num}/${(value as { num: number; den: number }).den}`
             : String(value)
-    const out = await stream(whyWrongMessages(level, q, typed, aiLang, diagnostic ?? undefined), setAiText, fallback, 260)
+    const gate = streamGate(aiLang, setAiText)
+    const out = await stream(whyWrongMessages(found.world.id, q, typed, aiLang, diagnostic ?? undefined), gate.onText, fallback, 260)
     const src = [q.prompt, q.latex ?? '', q.answerDisplay, typed, ...q.solution, ...q.hints]
-    setAiText(isAiReady() && !isGrounded(out, src) ? fallback : verifyAiMath(out).text)
+    const ok = !isAiReady() || (!gate.blocked && isGrounded(out, src) && isLanguage(out, aiLang))
+    setAiText(ok ? verifyAiMath(out).text : fallback)
   }
 
   const quit = () => {
     stopSpeaking()
+    stopVoice()
     go('path')
   }
 
@@ -192,6 +277,16 @@ export function LessonScreen() {
         )}
       </div>
       <AnimatePresence>
+        {(storyStatus.pending > 0 || storyStatus.fresh) && (
+          <motion.div key={storyStatus.fresh ? 'fresh' : 'pending'} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="mx-auto -mt-1 mb-1 px-3 py-1 rounded-full bg-[#F2EAFD] border border-grape/30 text-grape text-[11px] font-black flex items-center gap-1.5"
+            role="status" aria-live="polite">
+            <span className={storyStatus.fresh ? '' : 'animate-pulse'}><Icon name="sparkle" size={14} /></span>
+            {storyStatus.fresh ? 'May bagong kwento si Pipo para sa iyo!' : 'Gumagawa si Pipo ng kwento…'}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {combo >= 2 && phase === 'correct' && (
           <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
             className="absolute top-14 left-1/2 -translate-x-1/2 z-20 pl-1.5 pr-3 py-1 rounded-full bg-flame text-white font-black text-sm flex items-center gap-1 shadow-[0_3px_0_#D96A00]">
@@ -201,19 +296,27 @@ export function LessonScreen() {
       </AnimatePresence>
 
       {/* Question */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-2 pb-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-2 pb-4 screen-bg" style={{ ['--screen-tint' as string]: world.soft }}>
         <AnimatePresence mode="wait">
           <motion.div key={idx} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.22 }}>
             <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider mb-2" style={{ color: world.colorDark }}>
               {missed.has(q.id) && idx >= total ? (
                 <><Icon name="history" size={20} /> Balikan natin</>
               ) : (
-                <><span className="px-2 py-0.5 rounded-lg text-white" style={{ background: world.color }}>{q.kind === 'input' ? 'Sagutan' : q.kind === 'choice' ? 'Piliin' : q.kind === 'tiles' ? 'Buuin' : q.kind === 'pizzaChef' ? 'Pizza Chef' : 'I-tap'}</span><Icon name={stage.icon} size={20} /> {stage.title}</>
+                <><span className="px-2 py-0.5 rounded-lg text-white" style={{ background: world.color }}>{q.kind === 'input' ? 'Sagutan' : q.kind === 'choice' ? 'Piliin' : q.kind === 'tiles' ? 'Buuin' : q.kind === 'pizzaChef' ? 'Pizza Chef' : 'I-tap'}</span>
+                  {q.origin === 'ai-story' ? (
+                    <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 14 }}
+                      className="px-2 py-0.5 rounded-lg bg-[#F2EAFD] text-grape border border-grape/30 flex items-center gap-1 normal-case tracking-normal" title="Isinulat ng on-device AI; ang mga numero at sagot ay galing sa code">
+                      <Icon name="sparkle" size={14} /> Kwento ni Pipo
+                    </motion.span>
+                  ) : (
+                    <><Icon name={stage.icon} size={20} /> {stage.title}</>
+                  )}</>
               )}
             </div>
             <div className="flex items-start gap-3 mb-4">
               <Pipo mood={mood} size={84} className="shrink-0" />
-              <div className="relative mt-2 rounded-2xl border-2 border-line px-4 py-3 font-bold text-[17px] leading-snug flex-1">
+              <div className="relative mt-2 rounded-2xl border-2 border-line bg-white px-4 py-3 font-bold text-[17px] leading-snug flex-1">
                 {q.prompt}
                 <span className="absolute -left-2 top-6 w-4 h-4 rotate-45 bg-white border-l-2 border-b-2 border-line" />
               </div>
@@ -253,7 +356,7 @@ export function LessonScreen() {
                   }`}
                   style={{ ['--shadow' as string]: scratchpadOpen ? 'var(--color-sky)' : '#E0D9E8' }}
                 >
-                  <span className="text-base">✏️</span>
+                  <Icon name="pencil" size={18} />
                   <span>{scratchpadOpen ? 'Itago ang Kwaderno' : 'Kwaderno (Scratchpad)'}</span>
                 </button>
               </div>
@@ -319,7 +422,7 @@ export function LessonScreen() {
               <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${phase === 'correct' ? 'bg-leaf' : 'bg-heart'}`}>
                 {phase === 'correct' ? <Icon name="check" size={22} /> : <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6 6 18" stroke="#fff" strokeWidth="4" strokeLinecap="round" /></svg>}
               </span>
-              {phase === 'correct' ? PRAISE[idx % PRAISE.length] : COMFORT[idx % COMFORT.length]}
+              <span className={(feedbackLine?.length ?? 0) > 26 ? 'text-xl leading-tight' : ''}>{feedbackLine ?? COMFORT[idx % COMFORT.length]}</span>
             </div>
 
             {phase === 'wrong' && (
@@ -334,8 +437,8 @@ export function LessonScreen() {
               <div className="rounded-2xl bg-white border-2 border-heart/25 p-3.5 mb-3 shadow-[0_2px_8px_rgba(217,51,85,0.08)]">
                 <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-line">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`px-2 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide ${diagnostic.badgeBg} ${diagnostic.badgeText}`}>
-                      {diagnostic.badge}
+                    <span className={`px-2 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide inline-flex items-center gap-1 ${diagnostic.badgeBg} ${diagnostic.badgeText}`}>
+                      <Icon name={diagnostic.badgeIcon} size={14} /> {diagnostic.badge}
                     </span>
                     <span className="font-black text-sm text-ink">{diagnostic.title}</span>
                   </div>

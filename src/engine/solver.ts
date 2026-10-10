@@ -1,19 +1,69 @@
 // Deterministic math engine for the tutor. The CODE computes; the AI only explains.
-import { ComputeEngine } from '@cortex-js/compute-engine'
+import { ce, clean, type Expr } from './ce'
+import { solveCalculus } from './calculus'
+import { compileReal } from './realfn'
+import { makeGraph, type GraphSpec } from './graph'
 
-const ce = new ComputeEngine()
-type Expr = NonNullable<ReturnType<typeof ce.parse>>
+export type { GraphPoint, GraphSpec } from './graph'
 
 export interface CalcStep { label: string; tex: string }
+
 export interface CalcResult {
-  kind: 'evaluate' | 'simplify' | 'solve' | 'error'
+  kind: 'evaluate' | 'simplify' | 'solve' | 'derivative' | 'integral' | 'limit' | 'error'
   input: string
   steps: CalcStep[]
   answer: string // LaTeX
   plain: string // plain-text answer for the AI prompt
+  /** Deterministically sampled from the verified expression (src/engine/graph.ts) — never AI-guessed. */
+  graph?: GraphSpec
+  /** Equivalent forms of the answer (e.g. factored), shown after it — never a step before it */
+  also?: CalcStep[]
+  /** What the learner asked for (kept so a re-check recomputes the same thing) */
+  intent?: Intent
 }
 
-const clean = (tex: string) => tex.replace(/\\,/g, '').replace(/\\overline\{(\d+)\}/g, '$1$1$1…')
+/**
+ * Make messy-but-meaningful input parse the way a learner means it. MathLive input, chat
+ * messages and pasted text all pass through here. compute-engine follows TeX rules, so
+ * e.g. `x^10` would be x¹·0 and a bare `%` starts a comment (25% → 25) — both silently wrong.
+ */
+export function prepareLatex(latex: string): string {
+  let s = latex.trim()
+  s = s
+    .replace(/[×✕]/g, '\\times ').replace(/÷/g, '\\div ').replace(/[−–—]/g, '-').replace(/[·⋅]/g, '\\cdot ')
+    .replace(/²/g, '^{2}').replace(/³/g, '^{3}').replace(/π/g, '\\pi ')
+    .replace(/√\s*(\d+(?:\.\d+)?|[a-z])/g, '\\sqrt{$1}')
+  s = s.replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|!|,|;|:|quad|qquad)/g, ' ')
+  s = s.replace(/\\placeholder\{\}/g, '')
+  s = s.replace(/(^|[^\\])%/g, '$1\\%') // bare % is a TeX comment
+  s = s.replace(/(\d)\{,\}(\d{3})/g, '$1$2').replace(/(\d),(\d{3})(?!\d)/g, '$1$2') // 1,000
+  // x^-2 is invalid TeX, so bracing it is safe. Multi-digit exponents are NOT braced here: MathLive
+  // writes ∫₀² 3x² as \int_0^23x^2 (TeX: ^2 then 3x²) — hand-typed text goes through braceTypedExponents.
+  s = s.replace(/\^\s*(-\d+(?:\.\d+)?|-[a-zA-Z])/g, '^{$1}')
+  s = s.replace(/(\d)\s+[xX]\s+(\d)/g, '$1\\times $2') // "15 x 4" with spaces = times
+  s = s.replace(/\*/g, '\\cdot ')
+  // worksheet leftovers: "5 + 3 = ?" / "= 8" / trailing operator
+  s = s.replace(/=\s*(\?|_+|\\_+|\\square|\\Box)?\s*$/, '').replace(/^\s*=/, '')
+  s = s.replace(/(\+|-|\\times|\\div|\\cdot)\s*$/, '')
+  // brackets the learner forgot to close (or open): balance ( ) and { }
+  for (const [o, c] of [['(', ')'], ['{', '}']] as const) {
+    let open = 0, extra = 0
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '\\' && (s[i + 1] === '{' || s[i + 1] === '}')) { i++; continue }
+      if (s[i] === o) open++
+      else if (s[i] === c) { if (open) open--; else extra++ }
+    }
+    if (o === '(') s = '('.repeat(extra) + s + ')'.repeat(open)
+    else s = s + '}'.repeat(open)
+  }
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * For LaTeX a person typed as plain text (chat messages): "x^10" means
+ * x to the 10th, not TeX's x¹·0. Never apply this to MathLive output, which is already exact TeX.
+ */
+export const braceTypedExponents = (s: string) => s.replace(/\^(-?\d+(?:\.\d+)?)/g, '^{$1}')
 
 /** Number → nice LaTeX (integer, small fraction, or rounded decimal) */
 export function numTex(n: number): string {
@@ -50,6 +100,18 @@ function valueAt(f: Expr, v: string, x: number): number {
   return typeof r === 'number' ? r : NaN
 }
 
+/** Graph of a one-variable expression, or undefined when it isn't something we can plot exactly */
+function graphOf(f: Expr, v: string, label: string, roots?: number[]): GraphSpec | undefined {
+  try {
+    const fn = compileReal(f.json, v)
+    if (!fn) return undefined
+    const trig = /"(Sin|Cos|Tan|Sec|Csc|Cot)"/.test(JSON.stringify(f.json))
+    return makeGraph(fn, { varName: v, label, trig, roots: roots?.filter(Number.isFinite) }) ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** Pull a math expression out of a plain-text message, e.g. "solve 2x+3=11" or "25% ng 80" */
 export function extractMath(text: string): string | null {
   let t = text.replace(/(\d+(?:\.\d+)?)\s*%\s*(?:ng|of)\s*(\d+(?:\.\d+)?)/gi, '$1\\% \\cdot $2')
@@ -60,16 +122,42 @@ export function extractMath(text: string): string | null {
     .filter((p) => /\d/.test(p) && /[+\-*/^=×÷%]|\\cdot|\\sqrt/.test(p) && p.length >= 3)
     .sort((a, b) => b.length - a.length)[0]
   if (!best) return null
-  return best.replace(/\*/g, '\\cdot ').replace(/×/g, '\\times ').replace(/÷/g, '\\div ')
+  return braceTypedExponents(best.replace(/\*/g, '\\cdot ').replace(/×/g, '\\times ').replace(/÷/g, '\\div '))
 }
 
-export function solveLatex(latex: string): CalcResult {
-  const input = latex.trim()
+/** What the learner asked the calculator to do, from their message ("i-factor mo ito", "expand") */
+export type Intent = 'factor' | 'expand' | 'simplify'
+
+export function detectIntent(text: string): Intent | undefined {
+  const t = text.toLowerCase()
+  if (/\b(i-?)?factor|factori[sz]|\bgcf\b/.test(t)) return 'factor'
+  if (/\b(i-?)?expand|palawakin|i-multiply out/.test(t)) return 'expand'
+  if (/\b(i-?)?simplif|pasimplehin|pinakasimple/.test(t)) return 'simplify'
+  return undefined
+}
+
+/** Same LaTeX up to braces/spacing (x^{2} vs x^2) */
+const sameTex = (a: string, b: string) => a.replace(/[{}\s]/g, '') === b.replace(/[{}\s]/g, '')
+
+/** What the Tutor runs for a chat turn: the typed math (or math in the text) plus the learner's request */
+export function solveChat(typedMath: string, userText: string): CalcResult | undefined {
+  const src = typedMath || extractMath(userText) || ''
+  if (!src) return undefined
+  const intent = detectIntent(userText)
+  return { ...solveLatex(src, { intent }), intent }
+}
+
+export function solveLatex(latex: string, opts: { intent?: Intent } = {}): CalcResult {
+  const input = prepareLatex(latex)
   const fail = (msg: string): CalcResult => ({ kind: 'error', input, steps: [], answer: `\\text{${msg}}`, plain: msg })
   try {
     const expr = ce.parse(input)
     if (!expr || !expr.isValid) return fail('Kulang o mali ang expression')
     const unknowns = expr.unknowns
+
+    // ---- Calculus (derivative / integral / limit) — computed, then numerically re-checked ----
+    const calc = solveCalculus(expr, input, fail)
+    if (calc) return calc
 
     // ---- Equation ----
     if (input.includes('=') && expr.operator === 'Equal') {
@@ -98,7 +186,9 @@ export function solveLatex(latex: string): CalcResult {
         }
         const ans = `${v} = ${numTex(-c / b1)}`
         steps.push({ label: 'Sagot', tex: ans })
-        return { kind: 'solve', input, steps, answer: ans, plain: ans.replace(/\\frac\{(-?\d+)\}\{(\d+)\}/g, '$1/$2') }
+        const result: CalcResult = { kind: 'solve', input, steps, answer: ans, plain: ans.replace(/\\frac\{(-?\d+)\}\{(\d+)\}/g, '$1/$2') }
+        result.graph = graphOf(f, v, `f(${v}) = ${poly([[b1, v], [c, '']])}`, [-c / b1])
+        return result
       }
       if (isPoly2 && Math.abs(a2) > 1e-12) {
         const D = b1 * b1 - 4 * a2 * c
@@ -107,40 +197,72 @@ export function solveLatex(latex: string): CalcResult {
         steps.push({ label: 'Discriminant', tex: `D = b^2 - 4ac = ${numTex(D)}` })
         if (D < 0) {
           steps.push({ label: 'Sagot', tex: '\\text{Walang real solution (D < 0)}' })
-          return { kind: 'solve', input, steps, answer: '\\text{Walang real solution}', plain: 'no real solution (D < 0)' }
+          const result: CalcResult = { kind: 'solve', input, steps, answer: '\\text{Walang real solution}', plain: 'no real solution (D < 0)' }
+          result.graph = graphOf(f, v, `f(${v}) = ${poly([[a2, `${v}^2`], [b1, v], [c, '']])}`)
+          return result
         }
         steps.push({ label: 'Quadratic formula', tex: `${v} = \\frac{-b \\pm \\sqrt{D}}{2a} = \\frac{${numTex(-b1)} \\pm \\sqrt{${numTex(D)}}}{${numTex(2 * a2)}}` })
         const ans = solTex.length ? solTex.map((s) => `${v} = ${s}`).join(',\\; ') : `${v} = ${numTex((-b1 + Math.sqrt(D)) / (2 * a2))},\\; ${v} = ${numTex((-b1 - Math.sqrt(D)) / (2 * a2))}`
         steps.push({ label: 'Sagot', tex: ans })
-        return { kind: 'solve', input, steps, answer: ans, plain: ans.replace(/\\;/g, ' ') }
+        const result: CalcResult = { kind: 'solve', input, steps, answer: ans, plain: ans.replace(/\\;/g, ' ') }
+        const roots = D === 0 ? [-b1 / (2 * a2)] : [(-b1 + Math.sqrt(D)) / (2 * a2), (-b1 - Math.sqrt(D)) / (2 * a2)]
+        result.graph = graphOf(f, v, `f(${v}) = ${poly([[a2, `${v}^2`], [b1, v], [c, '']])}`, roots)
+        return result
       }
       if (!solTex.length) return fail('Hindi ko ma-solve ito')
       const ans = solTex.map((s) => `${v} = ${s}`).join(',\\; ')
       steps.push({ label: 'Sagot', tex: ans })
-      return { kind: 'solve', input, steps, answer: ans, plain: ans }
+      const result: CalcResult = { kind: 'solve', input, steps, answer: ans, plain: ans }
+      const numericRoots = sols.map((s) => s.N().re).filter((r): r is number => typeof r === 'number' && Number.isFinite(r))
+      result.graph = graphOf(f, v, `f(${v}) = ${clean(f.latex)}`, numericRoots)
+      return result
     }
 
     // ---- Expression with variables ----
+    // The answer is always the result of the LAST step shown before it. Other equivalent forms go in
+    // `also` (shown after the answer), never as a step that the answer then contradicts.
     if (unknowns.length > 0) {
       const steps: CalcStep[] = [{ label: 'Ibinigay', tex: input }]
       const simp = clean(expr.simplify().latex)
-      let answer = simp
-      if (simp !== input) steps.push({ label: 'I-simplify', tex: simp })
+      if (!sameTex(simp, input)) steps.push({ label: 'I-simplify', tex: simp })
+      let expanded: string | null = null
       try {
         const ex = clean((ce.box(['Expand', expr.json]).evaluate() as Expr).latex)
-        if (ex !== simp && ex !== input) { steps.push({ label: 'I-expand', tex: ex }); answer = ex }
+        if (!sameTex(ex, simp) && !sameTex(ex, input)) expanded = ex
       } catch { /* not expandable */ }
+      let factored: string | null = null
       try {
         const fa = clean((ce.box(['Factor', expr.json]).evaluate() as Expr).latex)
-        if (fa !== simp && fa !== answer && fa.includes('(')) steps.push({ label: 'I-factor', tex: fa })
+        if (fa.includes('(') && !sameTex(fa, simp) && !sameTex(fa, expanded ?? '')) factored = fa
       } catch { /* not factorable */ }
+      const also: CalcStep[] = []
+      let answer: string
+      if (opts.intent === 'factor') {
+        if (factored) {
+          const gcf = factored.match(/^(-?\d+)\(/)?.[1]
+          if (gcf) steps.push({ label: 'Hanapin ang common factor (GCF)', tex: `\\text{GCF} = ${gcf}` })
+          steps.push({ label: 'I-factor', tex: factored })
+          answer = factored
+        } else {
+          steps.push({ label: 'Hindi na ma-factor', tex: expanded ?? simp })
+          answer = expanded ?? simp
+        }
+        if (expanded && factored) also.push({ label: 'Expanded form', tex: expanded })
+      } else {
+        if (expanded) steps.push({ label: 'I-expand', tex: expanded })
+        answer = expanded ?? simp
+        if (factored) also.push({ label: 'Factored form', tex: factored })
+      }
       steps.push({ label: 'Sagot', tex: answer })
-      return { kind: 'simplify', input, steps, answer, plain: answer }
+      const result: CalcResult = { kind: 'simplify', input, steps, answer, plain: answer, also: also.length ? also : undefined }
+      if (unknowns.length === 1) result.graph = graphOf(expr, unknowns[0], `f(${unknowns[0]}) = ${input}`)
+      return result
     }
 
     // ---- Pure number ----
     const exact = clean(expr.simplify().latex)
     const n = expr.N().re
+    if ((typeof n === 'number' && !Number.isFinite(n)) || /infty|NaN/.test(exact)) return fail('Undefined — bawal mag-divide sa 0')
     const steps: CalcStep[] = [{ label: 'Ibinigay', tex: input }]
     const decimal = typeof n === 'number' ? dec(n) : null
     const exactIsDecimal = /^-?[\d.]+$/.test(exact)

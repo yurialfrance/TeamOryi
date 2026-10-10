@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Pipo } from '../components/Pipo'
 import { Button, ProgressBar } from '../components/ui'
-import { WORLDS, type World } from '../curriculum/worlds'
+import { DEFAULT_WORLD, WORLDS, type World } from '../curriculum/worlds'
 import { useGame } from '../store/game'
 import { AiSetupCard } from './AiSetup'
 import { Icon } from '../components/Icon'
@@ -18,7 +18,7 @@ export function Onboarding() {
   const { set } = useGame()
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
-  const [level, setLevel] = useState<World['id']>('elem')
+  const [level, setLevel] = useState<World['id']>(DEFAULT_WORLD)
   const [goal, setGoal] = useState(20)
 
   const finish = () => set({ onboarded: true, name: name.trim() || 'Kaibigan', level, dailyGoal: goal, screen: 'path' })
@@ -37,6 +37,16 @@ export function Onboarding() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pt-6 pb-4">
+        {step === 0 && (
+          // branding moment before Pipo's greeting — the icon art carries the "Sipnayan" wordmark itself
+          <motion.img
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35 }}
+            src={`${import.meta.env.BASE_URL}icon-192.png`}
+            srcSet={`${import.meta.env.BASE_URL}icon-192.png 1x, ${import.meta.env.BASE_URL}icon-512.png 3x`}
+            alt="Sipnayan" width={112} height={112}
+            className="mx-auto mb-4 w-28 h-28 drop-shadow-[0_6px_10px_rgba(30,144,220,.25)]"
+          />
+        )}
         <div className="flex items-end gap-3 mb-6">
           <Pipo mood={(['wave', 'think', 'calendar', 'phone'] as const)[step]} size={step === 0 ? 120 : 92} className="bob shrink-0" />
           <motion.div key={step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}

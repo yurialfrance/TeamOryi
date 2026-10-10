@@ -2,10 +2,15 @@
 // Browsers start audio "suspended" until the user interacts, so we unlock on the first tap.
 
 let ctx: AudioContext | null = null
-let master: GainNode | null = null
+let master: GainNode | null = null // synthesized sfx
+let voiceBus: GainNode | null = null // Pipo's recorded voice-overs (src/lib/voice.ts)
 let muted = false
+const SFX_LEVEL = 0.9
 
-export const setMuted = (m: boolean) => { muted = m }
+const muteListeners = new Set<(m: boolean) => void>()
+export const setMuted = (m: boolean) => { muted = m; muteListeners.forEach((f) => f(m)) }
+export const isMuted = () => muted
+export const onMuteChange = (f: (m: boolean) => void) => { muteListeners.add(f) }
 
 function getCtx(): AudioContext | null {
   try {
@@ -13,15 +18,40 @@ function getCtx(): AudioContext | null {
       const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       ctx = new AC()
       const comp = ctx.createDynamicsCompressor()
+      comp.connect(ctx.destination)
       master = ctx.createGain()
-      master.gain.value = 0.9
-      master.connect(comp).connect(ctx.destination)
+      master.gain.value = SFX_LEVEL
+      master.connect(comp)
+      voiceBus = ctx.createGain()
+      voiceBus.gain.value = 1
+      voiceBus.connect(comp)
     }
     if (ctx.state === 'suspended') void ctx.resume()
     return ctx
   } catch {
     return null
   }
+}
+
+/** The shared context + voice bus, for voice.ts (null until audio exists / when unsupported) */
+export function voiceOutput(): { ctx: AudioContext; bus: GainNode } | null {
+  const c = getCtx()
+  return c && voiceBus ? { ctx: c, bus: voiceBus } : null
+}
+
+/** Lower the synthesized sfx while Pipo talks, so a fanfare doesn't drown the words */
+export function duckSfx(on: boolean) {
+  if (!ctx || !master) return
+  const t = ctx.currentTime
+  master.gain.cancelScheduledValues(t)
+  master.gain.setTargetAtTime(on ? SFX_LEVEL * 0.35 : SFX_LEVEL, t, on ? 0.05 : 0.25)
+}
+
+const gestureCallbacks: (() => void)[] = []
+/** Run once audio can actually play (after the first tap / key) — browsers block sound before that */
+export function onAudioUnlocked(fn: () => void) {
+  if (ctx?.state === 'running') fn()
+  else gestureCallbacks.push(fn)
 }
 
 // Unlock audio on the first user gesture (required on iOS / Chrome autoplay policy)
@@ -39,6 +69,10 @@ if (typeof window !== 'undefined') {
     if (c?.state === 'running') {
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('keydown', unlock)
+      gestureCallbacks.splice(0).forEach((f) => f())
+    } else if (c) {
+      // resume() is async — fire the waiting callbacks once it actually starts
+      void c.resume().then(() => { if (c.state === 'running') gestureCallbacks.splice(0).forEach((f) => f()) })
     }
   }
   window.addEventListener('pointerdown', unlock)

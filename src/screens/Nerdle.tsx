@@ -1,181 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import confetti from 'canvas-confetti'
 import { today, useGame } from '../store/game'
 import { Button } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { Pipo } from '../components/Pipo'
+import { ReportSheet } from '../components/ReportSheet'
 import { haptic, sfx } from '../lib/sfx'
-
-type TileStatus = 'correct' | 'present' | 'absent' | 'empty'
-type NerdleLength = 6 | 8
-
-// Curated 8-character equations (Classic)
-const EQUATIONS_8 = [
-  '14+28=42', '3*4+2=14', '96/3-2=30', '50-18=32', '25*3+5=80',
-  '100/4=25', '8*9-12=60', '70-35=35', '15+15=30', '48/6+4=12',
-  '6*7+10=52', '99-44=55', '12*3+4=40', '85-25=60', '32+19=51',
-  '64/8+7=15', '45+35=80', '9*9-11=70', '72/9+8=16', '18+19=37',
-  '55-22=33', '16*3-8=40', '40+25=65', '80/4+5=25', '27+36=63',
-  '7*7+11=60', '90-45=45', '13*4-2=50', '36/6+9=15', '54-18=36',
-  '21+49=70', '6*8-18=30', '42+38=80', '75/5+5=20', '29+31=60',
-  '8*8-14=50', '63-27=36', '11*5+5=60', '56/7+7=15', '34+28=62',
-]
-
-// Curated 6-character equations (Mini)
-const EQUATIONS_6 = [
-  '45-9=36', '7*8=56', '12/3=4', '25+5=30', '6*9=54',
-  '8+9=17', '60/5=12', '30-8=22', '4*7=28', '15-7=8',
-  '9*5=45', '16+8=24', '72/9=8', '33-6=27', '8*8=64',
-  '20+9=29', '48/6=8', '50-5=45', '6*6=36', '14+7=21',
-  '35/7=5', '40-4=36', '9*9=81', '18+6=24', '54/6=9',
-  '27-9=18', '7*5=35', '19+4=23', '42/7=6', '31-8=23',
-  '8*6=48', '11+9=20', '63/9=7', '52-8=44', '7*7=49',
-  '13+8=21', '32/8=4', '46-7=39', '9*4=36', '17+5=22',
-]
-
-/** Hash a date string to pick a deterministic daily puzzle index */
-function getDailyIndex(dateStr: string, poolLength: number): number {
-  let hash = 0
-  for (let i = 0; i < dateStr.length; i++) {
-    hash = (hash << 5) - hash + dateStr.charCodeAt(i)
-    hash |= 0
-  }
-  return Math.abs(hash) % poolLength
-}
-
-/** Pure safe expression evaluator without eval() */
-function evaluateExpression(expr: string): number | null {
-  if (!/^\d+([+\-*/]\d+)*$/.test(expr)) return null
-
-  const tokens = expr.match(/\d+|[+\-*/]/g)
-  if (!tokens) return null
-
-  // Reject leading zeroes like 05 unless single digit 0
-  for (const tok of tokens) {
-    if (/^\d+$/.test(tok) && tok.length > 1 && tok.startsWith('0')) return null
-  }
-
-  const nums: number[] = []
-  const ops: string[] = []
-  for (let i = 0; i < tokens.length; i++) {
-    if (i % 2 === 0) nums.push(parseInt(tokens[i], 10))
-    else ops.push(tokens[i])
-  }
-
-  // Precedence 1: Multiplication and Division
-  const newNums: number[] = [nums[0]]
-  const newOps: string[] = []
-
-  for (let i = 0; i < ops.length; i++) {
-    const op = ops[i]
-    const nextNum = nums[i + 1]
-    if (op === '*') {
-      newNums[newNums.length - 1] = newNums[newNums.length - 1] * nextNum
-    } else if (op === '/') {
-      if (nextNum === 0) return null
-      if (newNums[newNums.length - 1] % nextNum !== 0) return null // must divide evenly
-      newNums[newNums.length - 1] = newNums[newNums.length - 1] / nextNum
-    } else {
-      newOps.push(op)
-      newNums.push(nextNum)
-    }
-  }
-
-  // Precedence 2: Addition and Subtraction
-  let result = newNums[0]
-  for (let i = 0; i < newOps.length; i++) {
-    const op = newOps[i]
-    const nextNum = newNums[i + 1]
-    if (op === '+') result += nextNum
-    else if (op === '-') result -= nextNum
-  }
-
-  if (result < 0 || !Number.isInteger(result)) return null
-  return result
-}
-
-/** Validate whether a full equation is mathematically correct and well-formed */
-function validateEquation(eq: string, targetLength: number): { valid: boolean; error?: string } {
-  if (eq.length !== targetLength) {
-    return { valid: false, error: `Kulang pa! Dapat ${targetLength} karakter ang equation.` }
-  }
-  const parts = eq.split('=')
-  if (parts.length !== 2) {
-    return { valid: false, error: "Kailangan ng eksaktong isang '=' sign!" }
-  }
-  const [left, right] = parts
-  if (!left || !right) {
-    return { valid: false, error: "Dapat may math expression bago at pagkatapos ng '='!" }
-  }
-  if (!/^\d+$/.test(right) || (right.length > 1 && right.startsWith('0'))) {
-    return { valid: false, error: "Ang sagot pagkatapos ng '=' ay dapat buong numero lamang." }
-  }
-
-  const leftVal = evaluateExpression(left)
-  if (leftVal === null) {
-    return { valid: false, error: 'Hindi wastong math! Suriin ang mga operator o division.' }
-  }
-  const rightVal = parseInt(right, 10)
-  if (leftVal !== rightVal) {
-    return { valid: false, error: `Hindi balance ang equation: ${left} = ${leftVal}, hindi ${rightVal}!` }
-  }
-
-  return { valid: true }
-}
-
-/** Wordle duplicate letter algorithm for tile feedbacks */
-function checkGuess(guess: string, target: string): TileStatus[] {
-  const n = target.length
-  const res: TileStatus[] = new Array(n).fill('absent')
-  const targetChars = target.split('')
-  const guessChars = guess.split('')
-
-  // Pass 1: Mark exact matches (Green)
-  for (let i = 0; i < n; i++) {
-    if (guessChars[i] === targetChars[i]) {
-      res[i] = 'correct'
-      targetChars[i] = ''
-      guessChars[i] = ''
-    }
-  }
-
-  // Pass 2: Mark present in different position (Purple)
-  for (let i = 0; i < n; i++) {
-    if (guessChars[i] !== '') {
-      const char = guessChars[i]
-      const targetIdx = targetChars.indexOf(char)
-      if (targetIdx !== -1) {
-        res[i] = 'present'
-        targetChars[targetIdx] = ''
-      }
-    }
-  }
-
-  return res
-}
+import { TIER_LABEL, checkGuess, dailyPuzzle, practicePuzzle, validateEquation, type NerdleLength, type Puzzle, type TileStatus } from '../games/nerdle'
 
 export function NerdleScreen() {
-  const { go, xp, todayXp, nerdleStreak, nerdleLastDate, nerdleWins, nerdlePlayed, set: setGame } = useGame()
+  const { go, xp, todayXp, nerdleStreak, nerdleLastDate, nerdleWins, nerdlePlayed, set: setGame, recordAttempt } = useGame()
 
   const [length, setLength] = useState<NerdleLength>(8)
   const [isDaily, setIsDaily] = useState<boolean>(true)
-  const [practiceIndex, setPracticeIndex] = useState(0)
+  const [practice, setPractice] = useState<Puzzle | null>(null)
+  const recentPractice = useRef<string[]>([])
+  const startedAt = useRef(0)
   const [toast, setToast] = useState<string | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
 
   const todayStr = useMemo(() => today(), [])
 
-  // Determine target equation
-  const targetEquation = useMemo(() => {
-    const pool = length === 8 ? EQUATIONS_8 : EQUATIONS_6
-    if (isDaily) {
-      const idx = getDailyIndex(todayStr + '-' + length, pool.length)
-      return pool[idx]
-    }
-    // Practice: seeded by practiceIndex
-    return pool[practiceIndex % pool.length]
-  }, [length, isDaily, todayStr, practiceIndex])
+  // Daily: fixed by date (difficulty follows the weekday); practice: random, not recently played
+  const puzzle = useMemo<Puzzle>(() => {
+    if (isDaily || !practice || practice.equation.length !== length) return isDaily ? dailyPuzzle(todayStr, length) : practicePuzzle(length, recentPractice.current)
+    return practice
+  }, [length, isDaily, todayStr, practice])
+  const targetEquation = puzzle.equation
+  useEffect(() => { startedAt.current = Date.now() }, [targetEquation])
 
   const [guesses, setGuesses] = useState<string[]>([])
   const [currentGuess, setCurrentGuess] = useState<string>('')
@@ -197,7 +51,7 @@ export function NerdleScreen() {
     setHasWon(false)
     setShareCopied(false)
     if (nextPractice) {
-      setPracticeIndex(Math.floor(Math.random() * 100))
+      setPractice(practicePuzzle(length, recentPractice.current))
     }
   }, [])
 
@@ -263,6 +117,8 @@ export function NerdleScreen() {
       setIsGameOver(true)
       setHasWon(true)
 
+      recordAttempt('nerdle', puzzle.topic, true, Date.now() - startedAt.current)
+      if (!isDaily) recentPractice.current = [targetEquation, ...recentPractice.current].slice(0, 20)
       // Update store stats
       const isNewDaily = isDaily && nerdleLastDate !== todayStr
       const newStreak = isNewDaily ? nerdleStreak + 1 : nerdleStreak
@@ -280,6 +136,8 @@ export function NerdleScreen() {
       haptic(30)
       setIsGameOver(true)
       setHasWon(false)
+      recordAttempt('nerdle', puzzle.topic, false, Date.now() - startedAt.current)
+      if (!isDaily) recentPractice.current = [targetEquation, ...recentPractice.current].slice(0, 20)
       setGame({
         nerdlePlayed: nerdlePlayed + 1,
       })
@@ -303,6 +161,8 @@ export function NerdleScreen() {
     nerdlePlayed,
     nerdleWins,
     showToast,
+    puzzle.topic,
+    recordAttempt,
   ])
 
   // Physical keyboard listener
@@ -360,13 +220,13 @@ export function NerdleScreen() {
     const shareText = `Sipnayan Nerdle (${todayStr}) ${hasWon ? guesses.length : 'X'}/6\n\n${emojiGrid}\n\nLaruin offline sa Sipnayan Math!`
     navigator.clipboard?.writeText(shareText).then(() => {
       setShareCopied(true)
-      showToast('Nakopya sa clipboard ang resulta! 📋')
+      showToast('Nakopya sa clipboard ang resulta!')
       setTimeout(() => setShareCopied(false), 2000)
     })
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#F7F5FA] relative select-none">
+    <div className="h-full flex flex-col bg-white relative select-none">
       {/* Top Header */}
       <header className="px-3 py-2 bg-white border-b-2 border-line flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-2">
@@ -446,6 +306,11 @@ export function NerdleScreen() {
           </button>
         </div>
       </div>
+      <div className="flex justify-center -mt-1 mb-1">
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${puzzle.tier === 'easy' ? 'bg-leaf-soft text-leaf-dark' : puzzle.tier === 'medium' ? 'bg-sun-soft text-sun-dark' : 'bg-heart-soft text-heart-dark'}`}>
+          {TIER_LABEL[puzzle.tier]}{isDaily && length === 8 ? ' · ayon sa araw ng linggo' : ''}
+        </span>
+      </div>
 
       {/* Toast Alert */}
       <AnimatePresence>
@@ -462,7 +327,7 @@ export function NerdleScreen() {
       </AnimatePresence>
 
       {/* Main Game Board */}
-      <main className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center justify-center p-3">
+      <main className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center justify-center p-3 screen-bg" style={{ ['--screen-tint' as string]: '#E6DCFA' }}>
         <div className="w-full max-w-[360px] space-y-1.5 my-auto">
           {Array.from({ length: 6 }, (_, rowIndex) => {
             const isCompleted = rowIndex < guesses.length
@@ -519,7 +384,7 @@ export function NerdleScreen() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-[360px] mt-3 p-3.5 rounded-2xl bg-white border-2 border-line shadow-md text-center space-y-2.5"
+            className="card-soft w-full max-w-[360px] mt-3 p-3.5 rounded-2xl text-center space-y-2.5"
           >
             <div className="flex items-center justify-center gap-2">
               <Pipo mood={hasWon ? 'medal' : 'think'} size={50} />
@@ -538,7 +403,7 @@ export function NerdleScreen() {
 
             <div className="flex gap-2">
               <Button tone="grape" className="flex-1 text-xs py-2" onClick={handleShare}>
-                {shareCopied ? 'Nakopya na! ✓' : 'I-share 📋'}
+                {shareCopied ? 'Nakopya na!' : 'I-share'}
               </Button>
               <Button
                 tone="white"
@@ -549,6 +414,11 @@ export function NerdleScreen() {
                 }}
               >
                 Maglaro Ulit ↺
+              </Button>
+            </div>
+            <div>
+              <Button tone="white" className="w-full text-xs py-2" onClick={() => setReportOpen(true)}>
+                <Icon name="chartUp" size={18} /> Assessment Report
               </Button>
             </div>
           </motion.div>
@@ -628,6 +498,7 @@ export function NerdleScreen() {
           </button>
         </div>
       </div>
+      <ReportSheet open={reportOpen} onClose={() => setReportOpen(false)} kind="nerdle" />
     </div>
   )
 }

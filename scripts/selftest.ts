@@ -2,7 +2,7 @@ import { WORLDS } from '../src/curriculum/worlds'
 import { checkAnswer } from '../src/engine/check'
 let fails = 0, n = 0
 for (const w of WORLDS) for (const s of w.stages) for (const g of s.gens) for (let i = 0; i < 150; i++) {
-  const q = g(); n++
+  const q = g.make(); n++
   let v: unknown
   if (q.kind === 'choice') { v = q.correctIndex; if (q.correctIndex < 0 || new Set(q.choices.map(c=>c.latex??c.text)).size !== q.choices.length) { fails++; console.log('BAD CHOICES', s.id, q.choices, q.correctIndex) } }
   else if (q.kind === 'numberline') v = q.answerIndex

@@ -7,11 +7,11 @@ import { Pipo } from '../components/Pipo'
 import { OfflineBadge } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { RichText } from '../components/RichText'
-import { baseMessages, stream, useAi, type AiLang, type ChatMsg } from '../ai/llm'
-import { extractMath, solveLatex, verifyAiMath, type CalcResult } from '../engine/solver'
-import { DISAGREE, isGrounded, recheckReply, stepLabel, templateExplain } from '../ai/guard'
+import { LANG_REMINDER, baseMessages, stream, useAi, type AiLang, type ChatMsg } from '../ai/llm'
+import { solveChat, solveLatex, verifyAiMath, type CalcResult } from '../engine/solver'
+import { DISAGREE, chooseExplanation, isLanguage, recheckReply, stepLabel, streamGate, templateExplain } from '../ai/guard'
 import { AiSetupCard } from './AiSetup'
-import { CameraModal } from '../components/CameraModal'
+import { GraphView } from '../components/GraphView'
 
 type Source = 'ai' | 'verified' | 'recheck'
 interface Msg { role: 'user' | 'assistant'; text: string; latex?: string; calc?: CalcResult; fixed?: number; done?: boolean; aiError?: string; source?: Source }
@@ -60,6 +60,9 @@ function CalcCard({ calc, lang }: { calc: CalcResult; lang: AiLang }) {
   if (calc.kind === 'error') return null
   const steps = calc.steps.filter((s) => s.label !== 'Sagot')
   return (
+    <>
+    {/* code-computed graph first: it renders with the result, before Pipo's explanation streams in below */}
+    {calc.graph && <GraphView graph={calc.graph} />}
     <div className="rounded-2xl bg-white border-2 border-leaf/40 overflow-hidden mb-2">
       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-leaf-soft text-leaf-dark text-[11px] font-black uppercase tracking-wider">
         <Icon name="abacus" size={18} /> Sipnayan Calculator
@@ -80,7 +83,15 @@ function CalcCard({ calc, lang }: { calc: CalcResult; lang: AiLang }) {
         <span className="text-[11px] font-black uppercase tracking-wide text-sun-dark">{T[lang].answer}</span>
         <span className="text-[22px] font-bold overflow-x-auto no-scrollbar"><Tex tex={calc.answer} /></span>
       </div>
+      {/* equivalent forms come AFTER the answer — never as a step the answer then contradicts */}
+      {calc.also?.map((a) => (
+        <div key={a.label} className="mx-3 -mt-1.5 mb-3 px-3 py-1.5 rounded-xl bg-cloud flex items-center gap-2">
+          <span className="text-[11px] font-black uppercase tracking-wide text-ink-soft">{lang === 'taglish' ? 'Puwede ring isulat' : 'Also written as'} · {stepLabel(a.label, lang)}</span>
+          <span className="text-[18px] overflow-x-auto no-scrollbar"><Tex tex={a.tex} /></span>
+        </div>
+      ))}
     </div>
+    </>
   )
 }
 
@@ -88,7 +99,6 @@ export function TutorScreen() {
   const { level, history, go, aiLang, set, pushHistory } = useGame()
   const L = T[aiLang]
   const [showKb, setShowKb] = useState(true)
-  const [cameraOpen, setCameraOpen] = useState(false)
   const ai = useAi()
   const ready = ai.status === 'ready'
   const world = WORLDS.find((w) => w.id === level) ?? WORLDS[0]
@@ -114,14 +124,14 @@ export function TutorScreen() {
     // 0) Learner says "mali" → the CODE re-checks; Pipo does not just agree.
     const prev = lastCalc()
     if (!typedMath && DISAGREE.test(userText) && prev) {
-      const again = solveLatex(prev.input)
+      const again = solveLatex(prev.input, { intent: prev.intent })
       setMsgs((ms) => [...ms, user, { role: 'assistant', text: recheckReply(again, userText, aiLang), calc: again, done: true, source: 'recheck' }])
       return
     }
 
     // 1) CODE computes
-    const mathSrc = typedMath || extractMath(userText) || ''
-    const calc = mathSrc ? solveLatex(mathSrc) : undefined
+    // the learner's request ("i-factor mo") decides what the answer is — e.g. factored vs expanded
+    const calc = solveChat(typedMath, userText)
     const prior = msgs.slice(1).filter((m) => m.done || m.role === 'user').slice(-4)
     setMsgs((ms) => [...ms, user, { role: 'assistant', text: '', calc }])
     setBusy(true)
@@ -135,6 +145,9 @@ export function TutorScreen() {
       return
     }
 
+    // Graph first: let the code-computed graph paint before any explanation text arrives
+    if (calc?.graph) await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+
     const verified = calc ? templateExplain(calc, aiLang) : L.noAi
 
     // 2) AI only explains the computed result
@@ -142,31 +155,38 @@ export function TutorScreen() {
       ? [
           'CALCULATOR RESULT (correct — do not recompute, do not change any number):',
           `Problem: $${calc.input}$`,
+          // name what was done, so the model can't swap in another operation (e.g. "integral")
+          `Operation done by the calculator: ${calc.steps.filter((s) => s.label !== 'Ibinigay' && s.label !== 'Sagot').map((s) => stepLabel(s.label, 'english')).join(', ') || calc.kind}. Explain ONLY this — do not mention any other operation.`,
           `Steps: ${calc.steps.filter((s) => s.label !== 'Ibinigay').map((s) => `$${s.tex}$`).join(' → ')}`,
           `Answer: $${calc.answer}$`,
+          // the graph is drawn by code from these verified numbers — the AI must not describe or compute it
+          calc.graph ? 'A graph is already shown above. Do not describe the graph or compute any points from it.' : '',
           userText ? `Student says: ${userText}` : 'Explain these steps to the student in 2 short sentences.',
-        ].join('\n')
-      : [userText, typedMath ? `Math: $${typedMath}$` : ''].filter(Boolean).join('\n')
+          LANG_REMINDER[aiLang],
+        ].filter(Boolean).join('\n')
+      : [userText, typedMath ? `Math: $${typedMath}$` : '', LANG_REMINDER[aiLang]].filter(Boolean).join('\n')
     const chat: ChatMsg[] = [
       ...baseMessages(level, aiLang),
       ...prior.map((m) => ({ role: m.role, content: [m.text, m.latex ? `$${m.latex}$` : ''].filter(Boolean).join('\n') })),
       { role: 'user', content: ask },
     ]
     useAi.setState({ lastError: undefined })
-    const out = await stream(chat, (t) => update(t), verified, 200)
+    // 3) CODE checks the AI while it streams: text in the wrong language or naming an operation the
+    //    calculator didn't do never reaches the screen, and the final text is chosen by chooseExplanation
+    const gate = streamGate(aiLang, (t) => update(t), calc)
+    const out = await stream(chat, gate.onText, verified, 200)
     const aiError = ready ? useAi.getState().lastError : undefined
+    const aiAnswered = ready && !aiError
 
-    // 3) CODE checks the AI: ungrounded numbers/variables → use the verified explanation instead
-    if (calc && ready && !aiError) {
-      const sources = [calc.input, calc.answer, ...calc.steps.map((s) => s.tex), userText]
-      if (!isGrounded(out, sources)) {
-        update(verified, { done: true, source: 'verified' })
-        setBusy(false)
-        return
-      }
+    if (calc) {
+      const pick = chooseExplanation({ aiText: out, calc, lang: aiLang, userText, aiAnswered, blocked: gate.blocked })
+      const checked = pick.source === 'ai' ? verifyAiMath(pick.text) : { text: pick.text, fixed: 0 }
+      update(checked.text, { fixed: checked.fixed, done: true, aiError, source: pick.source })
+    } else {
+      // free chat (no math): same language rule, with a Taglish/English fallback instead of a template
+      const okText = aiAnswered && !gate.blocked && isLanguage(out, aiLang)
+      update(okText ? verifyAiMath(out).text : L.noAi, { done: true, aiError, source: okText ? 'ai' : 'verified' })
     }
-    const checked = verifyAiMath(out)
-    update(checked.text, { fixed: checked.fixed, done: true, aiError, source: ready && !aiError ? 'ai' : 'verified' })
     setBusy(false)
   }
 
@@ -181,14 +201,6 @@ export function TutorScreen() {
           <div className="font-black text-lg leading-tight">{L.title}</div>
           <OfflineBadge ready={ready} />
         </div>
-        <button
-          type="button"
-          onClick={() => setCameraOpen(true)}
-          aria-label="Kamera ni Pipo"
-          className="h-10 px-2.5 rounded-xl border-2 border-sun bg-sun-soft text-ink flex items-center gap-1.5 text-xs font-black hover:brightness-105 active:scale-95 transition cursor-pointer"
-        >
-          <span className="text-sm">📸</span> Kamera
-        </button>
         <button onClick={() => setShowKb((v) => !v)} aria-label="Math keyboard"
           className={`h-10 px-2.5 rounded-xl border-2 flex items-center gap-1 text-xs font-black ${showKb ? 'border-sky bg-sky-soft text-sky' : 'border-line text-ink-soft'}`}>
           <Icon name="abacus" size={22} /> {L.keys}
@@ -205,9 +217,9 @@ export function TutorScreen() {
         ))}
       </div>
 
-      <div ref={scroller} className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-3">
+      <div ref={scroller} className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-3 screen-bg" style={{ ['--screen-tint' as string]: '#DCE8FF' }}>
         {!ready && (
-          <div className="rounded-2xl bg-white border-2 border-line p-4">
+          <div className="card-soft rounded-2xl p-4">
             <div className="font-black mb-2 flex items-center gap-2"><Icon name="chip" size={26} /> {L.turnOn}</div>
             <AiSetupCard compact />
           </div>
@@ -255,7 +267,8 @@ export function TutorScreen() {
       </div>
       {showKb && (
         <MathKeyboard
-          tabs={world.tabs.includes('advanced') ? world.tabs : [...world.tabs, 'advanced']}
+          // the tutor always offers 'advanced' and 'calculus', whatever the current world uses
+          tabs={[...world.tabs, ...(['advanced', 'calculus'] as const).filter((t) => !world.tabs.includes(t))]}
           onKey={(k) => mf.current?.press(k)}
           onAction={send}
           actionLabel={busy ? '…' : L.send}
@@ -265,15 +278,6 @@ export function TutorScreen() {
           onChip={(c) => setText((t) => (t ? t + ' ' : '') + c)}
         />
       )}
-
-      <CameraModal
-        open={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onCapture={(scanned) => {
-          setLatex(scanned)
-          mf.current?.set(scanned)
-        }}
-      />
     </div>
   )
 }

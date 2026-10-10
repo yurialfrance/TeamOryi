@@ -17,6 +17,10 @@ if (
 
 if (import.meta.env.DEV) (window as unknown as { __game: typeof useGame }).__game = useGame
 
+// Kamera ni Pipo (on-device OCR) was removed: free the ~29 MB of runtimes + handwriting model that
+// phones downloaded into this cache on first camera use. No-op when it was never created.
+if ('caches' in globalThis) void caches.delete('sipnayan-ocr-v1').catch(() => {})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

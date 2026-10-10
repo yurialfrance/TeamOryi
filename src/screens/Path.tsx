@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import confetti from 'canvas-confetti'
-import { ROADMAP, WORLDS, type Stage, type World } from '../curriculum/worlds'
+import { WORLDS, type Stage, type World } from '../curriculum/worlds'
 import { CHEST_GEMS, REFILL_COST, useGame } from '../store/game'
 import { BottomNav, Button, ProgressBar, Sheet, TopStats } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { Pipo } from '../components/Pipo'
 import { Tex } from '../lib/math'
 import { dailyQuests, isClaimed } from '../store/quests'
-import { Island, SKY, SoonIsland, WorldCard } from '../components/IslandMap'
+import { Island, SKY, WorldCard } from '../components/IslandMap'
 
 export function PathScreen() {
   const s = useGame()
   const { level, todayXp, dailyGoal, startLesson, startLearn, isUnlocked, completed, hearts, gems, buyRefill, go } = s
-  const [selectedWorldId, setSelectedWorldId] = useState<string | null>(level || 'primary')
+  const [selectedWorldId, setSelectedWorldId] = useState<string | null>(level || WORLDS[0].id)
   const [open, setOpen] = useState<{ world: World; stage: Stage; index: number } | null>(null)
   const [guide, setGuide] = useState<World | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -72,13 +72,17 @@ export function PathScreen() {
           </button>
         </div>
 
-        {ROADMAP.map((item, ri) => {
-          if (item.kind === 'soon') return <SoonIsland key={item.soon.id} soon={item.soon} />
-          const w = item.world
-          const wi = WORLDS.indexOf(w)
+        {WORLDS.map((w, wi) => {
           const isOpen = selectedWorldId === w.id
+          const firstSampler = w.tier === 'sampler' && WORLDS[wi - 1]?.tier !== 'sampler'
           return (
             <section key={w.id} ref={(el) => { refs.current[w.id] = el as HTMLDivElement | null }} className="relative pt-4 scroll-mt-2">
+              {firstSampler && (
+                <div className="mx-4 mb-3 mt-4 rounded-2xl bg-white/20 border-2 border-white/30 px-4 py-3 text-white">
+                  <div className="text-[11px] font-black uppercase tracking-wider opacity-85">Pasilip sa susunod na antas</div>
+                  <div className="font-black text-[15px] leading-snug">Senior High at College — subukan kahit hindi ka pa doon</div>
+                </div>
+              )}
               <WorldCard
                 world={w}
                 index={wi}
@@ -97,7 +101,7 @@ export function PathScreen() {
                   >
                     <Island
                       world={w}
-                      flip={ri % 2 === 1}
+                      flip={wi % 2 === 1}
                       onOpenStage={(st, i) => setOpen({ world: w, stage: st, index: i })}
                       onChest={() => setToast(`+${CHEST_GEMS} gems!`)}
                       onTrophyClaim={(claimedWorld) => {
@@ -114,7 +118,7 @@ export function PathScreen() {
         })}
         <div className="flex flex-col items-center gap-2 pb-10 pt-6">
           <Pipo mood="bye" size={110} />
-          <span className="text-white font-black text-sm text-center px-8 drop-shadow">Marami pang worlds ang darating! Abangan.</span>
+          <span className="text-white font-black text-sm text-center px-8 drop-shadow">Grade 1 hanggang Grade 10, pati SHS at College — lahat bukas. Pumili ka lang ng isla!</span>
         </div>
       </main>
 
@@ -180,8 +184,13 @@ export function PathScreen() {
               </div>
             </div>
             <div className="space-y-3">
-              {guide.guide.map((g, i) => (
-                <div key={i} className="rounded-2xl border-2 border-line p-4">
+              {guide.stages.flatMap((st, si) => st.guide.map((g, i) => (
+                <div key={`${st.id}-${i}`} className="rounded-2xl border-2 border-line p-4">
+                  {i === 0 && (
+                    <div className="text-[11px] font-black uppercase tracking-wider text-ink-soft mb-1 flex items-center gap-1.5">
+                      <Icon name={st.icon} size={16} /> Stage {si + 1} · {st.title}
+                    </div>
+                  )}
                   <div className="font-black mb-1" style={{ color: guide.colorDark }}>{g.title}</div>
                   {g.tex && (
                     <div className="w-full overflow-x-auto no-scrollbar my-2 px-1 flex justify-center items-center">
@@ -192,7 +201,7 @@ export function PathScreen() {
                   )}
                   <div className="font-semibold text-ink-soft text-[15px]">{g.text}</div>
                 </div>
-              ))}
+              )))}
             </div>
           </div>
         )}

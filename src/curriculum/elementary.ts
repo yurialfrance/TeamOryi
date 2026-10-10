@@ -169,6 +169,7 @@ export const fractionWord: Generator = () => {
     return {
       id: uid(),
       kind: 'input',
+      topic: 'fractions-addition-subtraction',
       prompt: `May isang pizza na hinati sa ${d} na pantay na hiwa. Kinain ni ${name} ang ${ate} na hiwa. Anong fraction ng pizza ang natira? (lowest terms)`,
       visual: { type: 'pizza', num: left, den: d },
       answers: [left / g === d / g ? '1' : frac(left / g, d / g)],
@@ -185,6 +186,7 @@ export const fractionWord: Generator = () => {
     return {
       id: uid(),
       kind: 'input',
+      topic: 'fractions-addition-subtraction',
       prompt: `Gumamit si Lola ng ${a}/${d} tasa ng gatas para sa leche flan at ${b}/${d} tasa para sa kape. Ilang tasa lahat ang nagamit? (lowest terms)`,
       visual: { type: 'scene', icons: ['flan', 'coffee'] },
       answers: [frac(s / g, d / g)],
@@ -201,6 +203,7 @@ export const fractionWord: Generator = () => {
   const q: Question = {
     id: uid(),
     kind: 'input',
+    topic: 'fractions-of-a-number',
     prompt: `May ${total} na pandesal sa bakery ni Aling Nena. Nabenta ang ${n}/${d} nito. Ilang pandesal ang nabenta?`,
     visual: { type: 'scene', icons: Array.from({ length: Math.min(6, total / d) }, () => 'bread' as const) },
     answers: [String(ans)],

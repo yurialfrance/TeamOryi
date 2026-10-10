@@ -7,6 +7,7 @@ import { BADGE_ART, Pipo } from '../components/Pipo'
 import { BottomNav, Button, ProgressBar, TopStats } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import { AiSetupCard } from './AiSetup'
+import { ReportSheet } from '../components/ReportSheet'
 import { setMuted } from '../lib/sfx'
 import { stopSpeaking } from '../lib/tts'
 import { exportBackupString, importBackupString } from '../store/backup'
@@ -86,7 +87,7 @@ function Badge({ id, icon, color, progress }: { id: string; icon: IconName; colo
 /** Reusable Header for profile subpages */
 function SubpageHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
   return (
-    <div className="sticky top-0 z-20 bg-white border-b-2 border-line px-4 py-3 flex items-center gap-3">
+    <div className="sticky top-0 z-20 bg-white border-b-2 border-line px-4 py-3 flex items-center gap-3 shadow-[0_6px_14px_-10px_rgba(91,60,140,.25)]">
       <button
         type="button"
         onClick={onBack}
@@ -125,7 +126,7 @@ function MenuCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl border-2 border-line bg-white p-3.5 flex items-center gap-3.5 text-left transition-all active:scale-[0.98] hover:border-sky/50 hover:bg-sky-soft/20 shadow-[0_3px_0_var(--color-line)] cursor-pointer"
+      className="card-soft w-full rounded-2xl p-3.5 flex items-center gap-3.5 text-left transition-all active:scale-[0.98] hover:border-sky/50 hover:bg-sky-soft/20 cursor-pointer"
     >
       <div
         className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-xs"
@@ -156,6 +157,7 @@ function MenuCard({
 export function ProfileScreen() {
   const s = useGame()
   const [page, setPage] = useState<ProfileSubpage>('main')
+  const [reportOpen, setReportOpen] = useState(false)
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
 
   const stagesDone = Object.keys(s.completed).length
@@ -165,9 +167,9 @@ export function ProfileScreen() {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <header className="px-3 py-2 border-b-2 border-line bg-white"><TopStats /></header>
+      <header className="relative z-10 px-3 py-2 border-b-2 border-line bg-white shadow-[0_6px_14px_-10px_rgba(91,60,140,.25)]"><TopStats /></header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar">
+      <main className="flex-1 overflow-y-auto no-scrollbar screen-bg">
         <AnimatePresence mode="wait">
           {page === 'main' && (
             <motion.div
@@ -210,7 +212,7 @@ export function ProfileScreen() {
                       ['star', stars, 'Stars'],
                       ['versus', s.duelWins, 'Duel wins'],
                     ] as [IconName, number | string, string][]).map(([icon, v, l]) => (
-                      <div key={l} className="rounded-2xl border-2 border-line p-3 flex items-center gap-3 bg-white shadow-2xs">
+                      <div key={l} className="card-soft rounded-2xl p-3 flex items-center gap-3">
                         <Icon name={icon} size={30} />
                         <div>
                           <div className="text-xl font-black leading-none">{v}</div>
@@ -222,7 +224,7 @@ export function ProfileScreen() {
                 </section>
 
                 {/* Streak Calendar - Preserved on main screen */}
-                <section className="rounded-2xl border-2 border-line p-4 bg-white shadow-2xs">
+                <section className="card-soft rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="font-black text-lg flex items-center gap-2">
                       <Icon name="calendar" size={24} /> Streak Calendar
@@ -248,6 +250,14 @@ export function ProfileScreen() {
                     title="Mga Setting"
                     subtitle={`Tunog: ${s.muted ? 'Naka-mute' : 'Bukas'} · ${WORLDS.find((w) => w.id === s.level)?.level}`}
                     onClick={() => setPage('settings')}
+                  />
+
+                  <MenuCard
+                    icon={<Icon name="chartUp" size={26} />}
+                    iconBg="var(--color-leaf-soft)"
+                    title="Assessment Report (PDF)"
+                    subtitle="Para sa magulang o guro: malakas at mahinang paksa, Landas at mga laro"
+                    onClick={() => setReportOpen(true)}
                   />
 
                   <MenuCard
@@ -279,6 +289,8 @@ export function ProfileScreen() {
                 </section>
 
                 <p className="text-center text-xs text-ink-soft font-bold pb-2 pt-2">
+                  <img src={`${import.meta.env.BASE_URL}icon-32.png`} srcSet={`${import.meta.env.BASE_URL}icon-32.png 1x, ${import.meta.env.BASE_URL}icon-64.png 2x`}
+                    alt="" aria-hidden width={20} height={20} className="inline-block w-5 h-5 mr-1.5 align-[-5px]" />
                   Sipnayan · Gawa ng TeamOryi para sa AppBuildersPH Hackathon 2026
                 </p>
               </div>
@@ -303,7 +315,7 @@ export function ProfileScreen() {
                 {/* Audio Setting */}
                 <section className="space-y-2">
                   <h2 className="text-sm font-black text-ink-soft uppercase tracking-wider">Audio at Effects</h2>
-                  <label className="flex items-center justify-between rounded-2xl border-2 border-line p-4 font-bold bg-white cursor-pointer hover:border-sky/50 transition">
+                  <label className="card-soft flex items-center justify-between rounded-2xl p-4 font-bold cursor-pointer hover:border-sky/50 transition">
                     <span className="flex items-center gap-3">
                       <span className="w-10 h-10 rounded-xl bg-sky-soft flex items-center justify-center shrink-0">
                         <Icon name={s.muted ? 'speakerOff' : 'speaker'} size={24} />
@@ -311,7 +323,7 @@ export function ProfileScreen() {
                       <div>
                         <div className="font-black text-ink">Sound Effects</div>
                         <div className="text-xs font-bold text-ink-soft">
-                          {s.muted ? 'Walang tunog ang pagsagot' : 'May tunog sa tama, mali, at combo'}
+                          {s.muted ? 'Walang tunog at boses ni Pipo' : 'May tunog at boses ni Pipo sa tama, mali, at combo'}
                         </div>
                       </div>
                     </span>
@@ -327,7 +339,7 @@ export function ProfileScreen() {
                   </label>
 
                   {/* Audio Speech / Voice Synthesis Toggle */}
-                  <label className="flex items-center justify-between rounded-2xl border-2 border-line p-4 font-bold bg-white cursor-pointer hover:border-grape/50 transition">
+                  <label className="card-soft flex items-center justify-between rounded-2xl p-4 font-bold cursor-pointer hover:border-grape/50 transition">
                     <span className="flex items-center gap-3">
                       <span className="w-10 h-10 rounded-xl bg-grape-soft flex items-center justify-center shrink-0">
                         <Icon name={s.voiceEnabled !== false ? 'tutor' : 'speakerOff'} size={24} />
@@ -404,7 +416,7 @@ export function ProfileScreen() {
                 {/* Defensive Backup & Restore */}
                 <section className="space-y-2">
                   <h2 className="text-sm font-black text-ink-soft uppercase tracking-wider">Ligtas na Backup at Restore</h2>
-                  <div className="p-4 rounded-2xl border-2 border-line bg-white space-y-3">
+                  <div className="card-soft p-4 rounded-2xl space-y-3">
                     <p className="text-xs font-semibold text-ink-soft leading-relaxed">
                       Protektado ng <b>SHA-256 cryptographic checksum</b> at <b>strict schema validation</b> upang matiyak na ligtas at hindi corrupted o injected ang iyong offline data.
                     </p>
@@ -416,7 +428,7 @@ export function ProfileScreen() {
                           const code = await exportBackupString()
                           try {
                             await navigator.clipboard.writeText(code)
-                            setBackupStatus('Nai-kopya sa clipboard ang backup code! 📋')
+                            setBackupStatus('Nai-kopya sa clipboard ang backup code!')
                           } catch {
                             prompt('Kopyahin ang iyong backup code:', code)
                           }
@@ -506,10 +518,10 @@ export function ProfileScreen() {
                     const progress = Math.min(1, Math.max(0, a.progress(s)))
                     return (
                       <div key={a.id} className="flex flex-col items-center text-center">
-                        {BADGE_ART.has(a.id) ? (
+                        {BADGE_ART.has(a.art ?? a.id) ? (
                           <div className="relative w-[76px] h-[76px]">
                             <img
-                              src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`}
+                              src={`${import.meta.env.BASE_URL}mascot/badge-${a.art ?? a.id}.webp`}
                               alt={a.title}
                               width={76}
                               height={76}
@@ -517,7 +529,7 @@ export function ProfileScreen() {
                               style={{ filter: 'grayscale(1)', opacity: 0.35 }}
                             />
                             <img
-                              src={`${import.meta.env.BASE_URL}mascot/badge-${a.id}.webp`}
+                              src={`${import.meta.env.BASE_URL}mascot/badge-${a.art ?? a.id}.webp`}
                               alt=""
                               aria-hidden
                               width={76}
@@ -574,7 +586,7 @@ export function ProfileScreen() {
                   {WORLDS.map((w) => {
                     const done = w.stages.filter((st) => s.completed[st.id]).length
                     return (
-                      <details key={w.id} className="rounded-2xl border-2 border-line p-3.5 bg-white shadow-2xs group">
+                      <details key={w.id} className="card-soft rounded-2xl p-3.5 group">
                         <summary className="list-none cursor-pointer">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: w.soft }}>
@@ -636,6 +648,7 @@ export function ProfileScreen() {
         </AnimatePresence>
       </main>
 
+      <ReportSheet open={reportOpen} onClose={() => setReportOpen(false)} />
       <BottomNav />
     </div>
   )

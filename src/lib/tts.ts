@@ -1,4 +1,5 @@
 import { useGame } from '../store/game'
+import { stopVoice } from './voice'
 
 let activeUtterance: SpeechSynthesisUtterance | null = null
 
@@ -80,6 +81,7 @@ export function speakText(
 ) {
   if (!isSpeechSupported() || !isSpeechEnabled()) return
   stopSpeaking()
+  stopVoice() // the read-aloud explanation wins over a voice-over clip
 
   const clean = mathToSpeechText(text)
   if (!clean) return

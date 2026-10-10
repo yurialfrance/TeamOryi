@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { World } from '../curriculum/worlds'
+import { DEFAULT_WORLD, worldIdOrDefault, type World } from '../curriculum/worlds'
+import type { TopicId } from '../engine/topics'
+import { addAttempt, type AttemptSource, type DuelPvpStats, type Progress } from './progress'
 
 export const MAX_HEARTS = 5
 
@@ -27,6 +29,8 @@ export interface LessonResult {
   bestCombo: number
   practice?: boolean
   heartsEarned?: number
+  /** achievement ids unlocked by this lesson (set by Lesson right after finishLesson) */
+  newBadges?: string[]
 }
 
 interface Persisted {
@@ -63,6 +67,10 @@ interface Persisted {
   nerdleLastDate: string | null
   nerdleWins: number
   nerdlePlayed: number
+  /** per-day, per-topic answer tallies for the assessment reports (src/store/progress.ts) */
+  progress: Progress
+  /** two-player Tagisan matches not attributed to this learner */
+  duelPvp: DuelPvpStats
 }
 
 interface Volatile {
@@ -78,6 +86,8 @@ interface Actions {
   startLearn: (stageId: string) => void
   startLesson: (stageId: string, practice?: boolean) => void
   recordDuel: (won: boolean) => void
+  /** one answered question/round, for the assessment reports */
+  recordAttempt: (source: AttemptSource, topic: TopicId, correct: boolean, ms: number) => void
   loseHeart: () => void
   refillHearts: () => void
   finishLesson: (r: Omit<LessonResult, 'streakUp'>) => void
@@ -93,7 +103,7 @@ interface Actions {
 const initial: Persisted = {
   onboarded: false,
   name: '',
-  level: 'elem',
+  level: DEFAULT_WORLD,
   dailyGoal: 30,
   xp: 0,
   todayXp: 0,
@@ -124,6 +134,8 @@ const initial: Persisted = {
   nerdleLastDate: null,
   nerdleWins: 0,
   nerdlePlayed: 0,
+  progress: {},
+  duelPvp: { matches: 0, rounds: 0, p1Correct: 0, p2Correct: 0 },
 }
 
 export const useGame = create<Persisted & Volatile & Actions>()(
@@ -139,6 +151,7 @@ export const useGame = create<Persisted & Volatile & Actions>()(
       go: (screen) => set({ screen }),
       startLearn: (stageId) => set({ stageId, screen: 'learn' }),
       startLesson: (stageId, practice = false) => set({ stageId, practice, screen: 'lesson', result: null }),
+      recordAttempt: (source, topic, correct, ms) => set((s) => ({ progress: addAttempt(s.progress ?? {}, today(), source, topic, correct, ms) })),
       recordDuel: (won) => set((s) => ({ duelsPlayed: s.duelsPlayed + 1, duelWins: s.duelWins + (won ? 1 : 0) })),
       loseHeart: () => set((s) => ({ hearts: Math.max(0, s.hearts - 1) })),
       refillHearts: () => set({ hearts: MAX_HEARTS }),
@@ -212,7 +225,8 @@ export const useGame = create<Persisted & Volatile & Actions>()(
       pushHistory: (latex) =>
         set((s) => ({ history: [latex, ...s.history.filter((h) => h !== latex)].slice(0, 16) })),
 
-      isUnlocked: (stages, index) => index === 0 || !!get().completed[stages[index - 1].id],
+      // sequential inside an island; a stage you already finished stays open (stages moved between islands keep their stars)
+      isUnlocked: (stages, index) => index === 0 || !!get().completed[stages[index].id] || !!get().completed[stages[index - 1].id],
 
       reset: () => set({ ...initial, screen: 'onboarding', stageId: null, result: null }),
     }),
@@ -236,6 +250,9 @@ export const useGame = create<Persisted & Volatile & Actions>()(
         if (state.lastLessonDate && state.lastLessonDate !== today() && state.lastLessonDate !== yesterday()) state.streak = 0
         if ((state.aiLang as string) === 'filipino') state.aiLang = 'taglish'
         state.claimedTrophies ??= []
+        state.level = worldIdOrDefault(state.level) // one island per grade: old band ids (primary, elem…) map to a grade
+        state.progress ??= {}
+        state.duelPvp ??= { matches: 0, rounds: 0, p1Correct: 0, p2Correct: 0 }
         state.screen = state.onboarded ? 'path' : 'onboarding'
       },
     },

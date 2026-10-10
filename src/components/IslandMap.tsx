@@ -1,25 +1,13 @@
 // Island-style learning map (inspired by isometric "world map" lesson paths).
 import { motion } from 'motion/react'
-import type { SoonWorld, Stage, World } from '../curriculum/worlds'
+import type { Stage, World } from '../curriculum/worlds'
 import { useGame } from '../store/game'
 import { Icon } from './Icon'
 import { Pipo } from './Pipo'
 import { sfx } from '../lib/sfx'
+import { say } from '../lib/voice'
+import { islandLayout, type Layout } from './islandLayout'
 
-const H = 430 // island height (px)
-// Node layout (x in %, y in px) — snake path from bottom-left up to the trophy
-const POS = {
-  s: [
-    { x: 17, y: 360 },
-    { x: 22, y: 262 },
-    { x: 45, y: 205 },
-    { x: 80, y: 172 },
-    { x: 60, y: 78 },
-  ],
-  chest: { x: 72, y: 288 },
-  trophy: { x: 22, y: 64 },
-}
-const ROUTE = [POS.s[0], POS.s[1], POS.s[2], POS.chest, POS.s[3], POS.s[4], POS.trophy]
 const fx = (x: number, flip: boolean) => (flip ? 100 - x : x)
 const pct = (x: number, flip: boolean) => `${fx(x, flip)}%`
 
@@ -62,9 +50,10 @@ function Pond({ x, y }: { x: string; y: number }) {
   )
 }
 
-function Road({ flip }: { flip: boolean }) {
+function Road({ flip, layout }: { flip: boolean; layout: Layout }) {
   // drawn in a 100×H viewBox; x is %, so use preserveAspectRatio="none" and non-scaling stroke
-  const d = ROUTE.map((p, i) => `${i ? 'L' : 'M'}${fx(p.x, flip)} ${p.y}`).join(' ')
+  const { H } = layout
+  const d = layout.route.map((p, i) => `${i ? 'L' : 'M'}${fx(p.x, flip)} ${p.y}`).join(' ')
   return (
     <svg className="absolute inset-0 w-full pointer-events-none" style={{ height: H }} viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-hidden>
       <path d={d} fill="none" stroke={GRASS.roadEdge} strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
@@ -83,12 +72,12 @@ function Flag({ color }: { color: string }) {
   )
 }
 
-function StageNode({ world, stage, index, onOpen, flip }: { world: World; stage: Stage; index: number; onOpen: () => void; flip: boolean }) {
+function StageNode({ world, stage, index, onOpen, flip, layout }: { world: World; stage: Stage; index: number; onOpen: () => void; flip: boolean; layout: Layout }) {
   const { completed, isUnlocked } = useGame()
   const done = completed[stage.id]
   const unlocked = isUnlocked(world.stages, index)
   const current = unlocked && !done
-  const p = POS.s[index]
+  const p = layout.s[index]
   return (
     <div className="absolute -translate-x-1/2 -translate-y-1/2 z-[2]" style={{ left: pct(p.x, flip), top: p.y }}>
       {current && <span className="absolute inset-[-8px] rounded-full pulse-ring pointer-events-none" />}
@@ -137,10 +126,10 @@ function StageNode({ world, stage, index, onOpen, flip }: { world: World; stage:
   )
 }
 
-function ChestTile({ world, onOpened, flip }: { world: World; onOpened: () => void; flip: boolean }) {
+function ChestTile({ world, onOpened, flip, layout }: { world: World; onOpened: () => void; flip: boolean; layout: Layout }) {
   const { completed, openedChests, openChest } = useGame()
   const id = `${world.id}-chest`
-  const ready = !!completed[world.stages[2].id]
+  const ready = !!completed[world.stages[layout.chestAfter].id]
   const opened = openedChests.includes(id)
   return (
     <button
@@ -148,7 +137,7 @@ function ChestTile({ world, onOpened, flip }: { world: World; onOpened: () => vo
       aria-label="Treasure chest"
       onClick={() => { if (ready && !opened && openChest(id)) { sfx.chest(); onOpened() } }}
       className="absolute -translate-x-1/2 -translate-y-1/2 z-[2]"
-      style={{ left: pct(POS.chest.x, flip), top: POS.chest.y }}
+      style={{ left: pct(layout.chest.x, flip), top: layout.chest.y }}
     >
       <span className="block w-[64px] h-[58px] rounded-2xl" style={{ background: '#7BE6D3', boxShadow: `0 8px 0 ${GRASS.side}` }} />
       <span className={`absolute inset-0 flex items-center justify-center -translate-y-2 ${ready && !opened ? 'wiggle' : ''}`}>
@@ -158,7 +147,7 @@ function ChestTile({ world, onOpened, flip }: { world: World; onOpened: () => vo
   )
 }
 
-function TrophyIslet({ world, flip, onClaim }: { world: World; flip: boolean; onClaim?: () => void }) {
+function TrophyIslet({ world, flip, onClaim, layout }: { world: World; flip: boolean; onClaim?: () => void; layout: Layout }) {
   const { completed, claimedTrophies, claimTrophy } = useGame()
   const done = world.stages.every((s) => completed[s.id])
   const claimed = (claimedTrophies ?? []).includes(world.id)
@@ -168,6 +157,7 @@ function TrophyIslet({ world, flip, onClaim }: { world: World; flip: boolean; on
     if (!claimed) {
       if (claimTrophy(world.id, 50)) {
         sfx.fanfare()
+        say('worldComplete', { after: 900 }) // after the fanfare's first run of bells
         onClaim?.()
       }
     } else {
@@ -177,7 +167,7 @@ function TrophyIslet({ world, flip, onClaim }: { world: World; flip: boolean; on
   }
 
   return (
-    <div className="absolute -translate-x-1/2 -translate-y-1/2 z-[2] flex flex-col items-center" style={{ left: pct(POS.trophy.x, flip), top: POS.trophy.y }}>
+    <div className="absolute -translate-x-1/2 -translate-y-1/2 z-[2] flex flex-col items-center" style={{ left: pct(layout.trophy.x, flip), top: layout.trophy.y }}>
       <button
         type="button"
         disabled={!done}
@@ -206,7 +196,7 @@ function TrophyIslet({ world, flip, onClaim }: { world: World; flip: boolean; on
               : 'bg-sun text-ink ring-2 ring-sun/50 pulse-ring'
           }`}
         >
-          {done ? (claimed ? 'Tapos! ✓' : 'Kolektahin! 💎') : 'Trophy'}
+          {done ? (claimed ? <span className="inline-flex items-center gap-0.5">Tapos! <Icon name="check" size={12} /></span> : <span className="inline-flex items-center gap-0.5">Kolektahin! <Icon name="gem" size={12} /></span>) : 'Trophy'}
         </span>
       </button>
     </div>
@@ -299,6 +289,10 @@ export function Island({
   onChest: () => void
   onTrophyClaim?: (world: World) => void
 }) {
+  const layout = islandLayout(world.stages.length)
+  const { H } = layout
+  // scenery scales with the island: trees down both edges, a house near the start, a pond midway
+  const trees = Array.from({ length: Math.floor(H / 150) }, (_, i) => ({ x: i % 2 ? 88 : 4, y: 110 + i * 150, s: i % 3 === 2 ? 0.8 : 1 }))
   return (
     <div className="relative mx-3 -mt-5" style={{ height: H + 40 }}>
       {/* main island body with cliff side */}
@@ -307,37 +301,15 @@ export function Island({
       {/* bays for an organic outline */}
       <div className="absolute top-[120px] w-[90px] h-[110px] rounded-[40px]" style={{ [flip ? 'left' : 'right']: -6, background: GRASS.top2, boxShadow: `0 16px 0 ${GRASS.side}` }} />
       <div className="absolute top-[-6px] w-[120px] h-[70px] rounded-[36px]" style={{ left: flip ? '42%' : '30%', background: GRASS.top }} />
-      <Road flip={flip} />
-      <Tree x={pct(4, flip)} y={130} /><Tree x={pct(9, flip)} y={150} s={0.8} /><Tree x={pct(84, flip)} y={250} /><Tree x={pct(90, flip)} y={276} s={0.85} />
-      <Tree x={pct(38, flip)} y={300} s={0.9} /><Tree x={pct(70, flip)} y={20} s={0.9} /><Tree x={pct(78, flip)} y={36} s={0.75} />
-      <House x={pct(flip ? 88 : 70, flip)} y={340} />
-      <Pond x={pct(flip ? 56 : 34, flip)} y={92} />
-      <TrophyIslet world={world} flip={flip} onClaim={() => onTrophyClaim?.(world)} />
-      <ChestTile world={world} onOpened={onChest} flip={flip} />
-      {world.stages.map((s, i) => <StageNode key={s.id} world={world} stage={s} index={i} flip={flip} onOpen={() => onOpenStage(s, i)} />)}
-    </div>
-  )
-}
-
-export function SoonIsland({ soon }: { soon: SoonWorld }) {
-  return (
-    <div className="relative mx-4 my-6">
-      <div className="rounded-[32px] p-4 pb-5 border-[3px] border-dashed border-white/50"
-        style={{ background: 'linear-gradient(165deg, rgba(255,255,255,.28), rgba(255,255,255,.12))', boxShadow: '0 14px 0 rgba(255,255,255,.12)' }}>
-        <div className="flex items-center gap-3">
-          <span className="w-12 h-12 rounded-2xl bg-white/80 flex items-center justify-center shrink-0"><Icon name="lock" size={30} /></span>
-          <div className="flex-1 min-w-0 text-white">
-            <div className="text-[11px] font-black uppercase tracking-wider opacity-80">{soon.level}</div>
-            <div className="text-lg font-black leading-tight">{soon.name}</div>
-          </div>
-          <span className="shrink-0 px-2.5 py-1 rounded-full bg-sun text-ink text-[10px] font-black uppercase tracking-wider shadow-[0_2px_0_var(--color-sun-dark)]">Coming soon</span>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {soon.topics.map((t) => (
-            <span key={t} className="px-2.5 py-1 rounded-full bg-white/85 text-[12px] font-bold text-ink-soft">{t}</span>
-          ))}
-        </div>
-      </div>
+      <Road flip={flip} layout={layout} />
+      {trees.map((t, i) => <Tree key={i} x={pct(t.x, flip)} y={t.y} s={t.s} />)}
+      {/* top trees sit on the side away from the trophy */}
+      <Tree x={pct(layout.trophy.x > 50 ? 10 : 70, flip)} y={20} s={0.9} /><Tree x={pct(layout.trophy.x > 50 ? 18 : 78, flip)} y={36} s={0.75} />
+      <House x={pct(flip ? 88 : 70, flip)} y={H - 90} />
+      <Pond x={pct(flip ? 56 : 34, flip)} y={Math.round(H / 2) - 24} />
+      <TrophyIslet world={world} flip={flip} layout={layout} onClaim={() => onTrophyClaim?.(world)} />
+      <ChestTile world={world} onOpened={onChest} flip={flip} layout={layout} />
+      {world.stages.map((s, i) => <StageNode key={s.id} world={world} stage={s} index={i} flip={flip} layout={layout} onOpen={() => onOpenStage(s, i)} />)}
     </div>
   )
 }

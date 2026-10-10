@@ -3,6 +3,8 @@
 // Discards corrupted, malformed, or injected keys to protect user state.
 
 import { useGame } from './game'
+import { worldIdOrDefault } from '../curriculum/worlds'
+import { sanitizeProgress, type DuelPvpStats, type Progress } from './progress'
 
 export interface BackupData {
   app: 'sipnayan'
@@ -29,9 +31,17 @@ export interface SanitizedState {
   duelWins: number
   lessonsDone: number
   perfectCount: number
+  /** assessment-report tallies (optional: older backups don't have them) */
+  progress?: Progress
+  duelPvp?: DuelPvpStats
 }
 
-const ALLOWED_LEVELS = new Set(['elem', 'jhs', 'shs', 'college'])
+
+const sanitizePvp = (raw: unknown): DuelPvpStats => {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const n = (k: string) => Math.max(0, Math.floor(Number(o[k]) || 0))
+  return { matches: n('matches'), rounds: n('rounds'), p1Correct: n('p1Correct'), p2Correct: n('p2Correct') }
+}
 
 /** Simple fast deterministic hash for checksum fallback */
 function computeHash(dataStr: string): string {
@@ -68,7 +78,7 @@ export async function exportBackupString(): Promise<string> {
 
   const safeData: SanitizedState = {
     name: String(s.name ?? '').slice(0, 40),
-    level: ALLOWED_LEVELS.has(s.level) ? s.level : 'elem',
+    level: worldIdOrDefault(s.level),
     dailyGoal: Math.max(10, Math.min(200, Number(s.dailyGoal) || 30)),
     xp: Math.max(0, Math.floor(Number(s.xp) || 0)),
     streak: Math.max(0, Math.floor(Number(s.streak) || 0)),
@@ -83,6 +93,8 @@ export async function exportBackupString(): Promise<string> {
     duelWins: Math.max(0, Math.floor(Number(s.duelWins) || 0)),
     lessonsDone: Math.max(0, Math.floor(Number(s.lessonsDone) || 0)),
     perfectCount: Math.max(0, Math.floor(Number(s.perfectCount) || 0)),
+    progress: sanitizeProgress(s.progress),
+    duelPvp: sanitizePvp(s.duelPvp),
   }
 
   // Sanitize completed map
@@ -179,8 +191,9 @@ export async function importBackupString(raw: string): Promise<ImportResult> {
   if (typeof dataObj.name === 'string') {
     safePatch.name = dataObj.name.replace(/[<>]/g, '').slice(0, 40)
   }
-  if (typeof dataObj.level === 'string' && ALLOWED_LEVELS.has(dataObj.level)) {
-    safePatch.level = dataObj.level
+  if (typeof dataObj.level === 'string') {
+    // known island ids pass; old band ids (elem, jhs…) map to their grade island; anything else → default
+    safePatch.level = worldIdOrDefault(dataObj.level)
   }
   if (typeof dataObj.dailyGoal === 'number' && Number.isFinite(dataObj.dailyGoal)) {
     safePatch.dailyGoal = Math.max(10, Math.min(200, Math.floor(dataObj.dailyGoal)))
@@ -218,6 +231,10 @@ export async function importBackupString(raw: string): Promise<ImportResult> {
   if (typeof dataObj.perfectCount === 'number' && Number.isFinite(dataObj.perfectCount)) {
     safePatch.perfectCount = Math.max(0, Math.floor(dataObj.perfectCount))
   }
+
+  // Assessment-report history (validated entry by entry)
+  if (dataObj.progress && typeof dataObj.progress === 'object') safePatch.progress = sanitizeProgress(dataObj.progress)
+  if (dataObj.duelPvp && typeof dataObj.duelPvp === 'object') safePatch.duelPvp = sanitizePvp(dataObj.duelPvp)
 
   // Sanitize completed
   if (dataObj.completed && typeof dataObj.completed === 'object' && !Array.isArray(dataObj.completed)) {

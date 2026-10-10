@@ -11,24 +11,34 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'pipo/*.png'],
+      // the icon PNGs are already precached by globPatterns; .ico isn't, so list it here.
+      // icon-master-500.png (source for `npm run cap:icons`) is excluded in globIgnores below.
+      includeAssets: ['favicon.ico', 'pipo/*.png'],
+      includeManifestIcons: false, // globPatterns already precaches them (avoids duplicate entries)
       manifest: {
         name: 'Sipnayan — Math na Masaya',
         short_name: 'Sipnayan',
         description: 'Duolingo-style math learning in Taglish, aligned to DepEd & CHED. 100% offline AI tutor.',
-        theme_color: '#2F6BFF',
+        theme_color: '#1E90DC', // the icon's sky blue (maskable-icon background)
         background_color: '#FFFFFF',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          // "any": transparent rounded-square icon; "maskable": same art inside the safe zone on an opaque sky-blue field
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'maskable-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: 'maskable-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,webmanifest}'],
+        // webp = Pipo's mascot art (public/mascot), mp3 = Pipo's voice-overs (public/voice-overs):
+        // both ~1.5 MB and needed on nearly every screen, so they're precached for offline use
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,mp3,woff2,ttf,wasm}'], // the plugin adds manifest.webmanifest itself
+        // jsPDF's optional html()/SVG helpers (html2canvas, DOMPurify, canvg) are never called by the
+        // report renderer — don't spend ~380 KB of every install on them
+        globIgnores: ['icon-master-500.png', '**/html2canvas-*.js', '**/purify.es-*.js', '**/index.es-*.js'],
         dontCacheBustURLsMatching: /\.[a-f0-9]{8}\./,
         cleanupOutdatedCaches: true,
         clientsClaim: true,

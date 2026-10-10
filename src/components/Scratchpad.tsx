@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Icon } from './Icon'
 import { motion, AnimatePresence } from 'motion/react'
 import { sfx } from '../lib/sfx'
 
@@ -209,7 +210,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
         {/* Top Control Bar */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b-2 border-line">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">✏️</span>
+            <Icon name="pencil" size={16} />
             <span className="font-black text-xs text-ink uppercase tracking-wider">Kwaderno (Scratchpad)</span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-grape-soft text-grape-dark">
               {strokes.length} guhit
@@ -231,7 +232,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
               className="w-7 h-7 rounded-lg text-ink-soft hover:bg-heart-soft hover:text-heart flex items-center justify-center font-black active:scale-95"
               aria-label="Isara ang kwaderno"
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           </div>
         </div>
@@ -249,7 +250,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
                     tool === 'pen' ? 'bg-grape text-white shadow-xs' : 'bg-white text-ink border border-line'
                   }`}
                 >
-                  <span>✏️</span> Lapis
+                  <Icon name="pencil" size={16} /> Lapis
                 </button>
                 <button
                   type="button"
@@ -258,7 +259,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
                     tool === 'eraser' ? 'bg-sky text-white shadow-xs' : 'bg-white text-ink border border-line'
                   }`}
                 >
-                  <span>🧹</span> Pambura
+                  <Icon name="eraser" size={16} /> Pambura
                 </button>
               </div>
 
@@ -318,7 +319,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
                   className="px-2 py-0.5 rounded-lg bg-white border border-line text-xs font-bold text-heart disabled:opacity-40 active:scale-95"
                   title="Burahin lahat"
                 >
-                  🗑️ Burahin
+                  <Icon name="trash" size={16} /> Burahin
                 </button>
               </div>
             </div>
@@ -347,7 +348,7 @@ export function Scratchpad({ open, onClose }: ScratchpadProps) {
 
               {strokes.length === 0 && (
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-ink-soft/40 select-none">
-                  <span className="text-2xl mb-1">✍️</span>
+                  <Icon name="pencil" size={30} className="mb-1" />
                   <span className="text-xs font-bold">Sumulat o mag-solve dito gamit ang daliri o stylus</span>
                 </div>
               )}

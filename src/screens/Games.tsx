@@ -7,12 +7,12 @@ import { Pipo } from '../components/Pipo'
 /** Games hub — more mini-games will land here, matched to the learner's level. */
 export function GamesScreen() {
   const { go, level, duelWins, duelsPlayed } = useGame()
-  const world = WORLDS.find((w) => w.id === level)!
+  const world = WORLDS.find((w) => w.id === level) ?? WORLDS[0]
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <header className="px-3 py-2 border-b-2 border-line bg-white"><TopStats /></header>
-      <main className="flex-1 overflow-y-auto no-scrollbar px-5 pt-5 pb-6">
+      <header className="relative z-10 px-3 py-2 border-b-2 border-line bg-white shadow-[0_6px_14px_-10px_rgba(91,60,140,.25)]"><TopStats /></header>
+      <main className="flex-1 overflow-y-auto no-scrollbar px-5 pt-5 pb-6 screen-bg" style={{ ['--screen-tint' as string]: '#E9E1FF' }}>
         <div className="flex items-center gap-2 mb-1">
           <Icon name="versus" size={30} />
           <h1 className="text-2xl font-black">Games</h1>
@@ -75,12 +75,12 @@ export function GamesScreen() {
           <span className="text-white text-xl font-black shrink-0">→</span>
         </button>
 
-        <div className="rounded-2xl border-2 border-dashed border-line p-4 mt-4 flex items-center gap-3 opacity-70">
+        <div className="rounded-2xl border-2 border-dashed border-[#D9CFE6] bg-white/95 p-4 mt-4 flex items-center gap-3 shadow-[0_10px_22px_-16px_rgba(91,60,140,.35)]">
           <span className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: world.soft }}>
             <Icon name="lock" size={28} />
           </span>
           <div className="flex-1 min-w-0">
-            <div className="font-black text-ink-soft">Marami pang laro</div>
+            <div className="font-black text-ink-soft opacity-80">Marami pang laro</div>
             <div className="text-xs font-bold text-ink-soft">Darating pa — babagay sa level mo, {world.level}.</div>
           </div>
         </div>

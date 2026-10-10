@@ -271,15 +271,6 @@ const ICONS = {
   sparkle: (
     <path d="M16 3c1 7 3 9 10 10-7 1-9 3-10 10-1-7-3-9-10-10 7-1 9-3 10-10Z" fill={C.sun} />
   ),
-  camera: (
-    <>
-      <path d="M10 9 12 5h8l2 4Z" fill={C.ink} />
-      <rect x="3" y="9" width="26" height="18" rx="4" fill={C.ink} />
-      <circle cx="16" cy="18" r="6.6" fill={C.sky} />
-      <circle cx="16" cy="18" r="3.8" fill={C.skyL} />
-      <circle cx="23.5" cy="13.2" r="1.4" fill={C.sun} />
-    </>
-  ),
   image: (
     <>
       <rect x="3" y="5" width="26" height="22" rx="4" fill="#fff" stroke="#E8E2EE" strokeWidth="2" />
@@ -306,6 +297,162 @@ const ICONS = {
     <>
       <path d="M8 10H19a8 8 0 1 1 0 16h-5" fill="none" stroke={C.sky} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M12.5 5 7 10l5.5 5" fill="none" stroke={C.sky} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  /* ---------- sari-sari store items (Cashier) ---------- */
+  noodles: (
+    <>
+      <path d="M19.5 2.5 13 14M24.5 3.5 16.5 14" stroke={C.wood} strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M3 15h26a13 11 0 0 1-26 0Z" fill={C.red} />
+      <path d="M16 15h13a13 11 0 0 1-13 11Z" fill={C.redD} opacity=".55" />
+      <path d="M6 15c1.2-3 3-3 4.2 0s3 3 4.2 0 3-3 4.2 0 3 3 4.2 0 3-3 4.2 0" fill="none" stroke={C.sun} strokeWidth="2.4" strokeLinecap="round" />
+      <Hi x={8} y={19} w={3.6} h={1.8} r={-15} />
+    </>
+  ),
+  bottle: (
+    <>
+      <rect x="12.5" y="1.5" width="7" height="3.4" rx="1.2" fill={C.ink} />
+      <path d="M13 4.5h6v3.5l3.5 4.5v14a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3v-14L13 8Z" fill={C.red} />
+      <path d="M16 4.5h3v3.5l3.5 4.5v14a3 3 0 0 1-3 3H16Z" fill={C.redD} opacity=".5" />
+      <rect x="9.5" y="15" width="13" height="6.5" fill="#fff" opacity=".92" />
+      <path d="M12 18.2h8" stroke={C.red} strokeWidth="1.6" strokeLinecap="round" />
+      <Hi x={12} y={11.5} w={1.8} h={4.2} r={0} />
+    </>
+  ),
+  egg: (
+    <>
+      <path d="M16 2.5c6.2 0 10.5 9.5 10.5 15.5a10.5 10.5 0 0 1-21 0C5.5 12 9.8 2.5 16 2.5Z" fill="#FFF4E4" stroke="#E6CFAE" strokeWidth="1.6" />
+      <path d="M26.5 18A10.5 10.5 0 0 1 16 28.5c5.2-3 7.6-9.4 6.4-16.6 2.4 2.4 4.1 4.6 4.1 6.1Z" fill="#EED8B6" />
+      <Hi x={11.5} y={10} w={3} h={5.4} r={20} />
+    </>
+  ),
+  biscuit: (
+    <>
+      <rect x="4" y="6" width="24" height="20" rx="3.5" fill="#EDA552" />
+      <path d="M16 6h8.5A3.5 3.5 0 0 1 28 9.5v13a3.5 3.5 0 0 1-3.5 3.5H16Z" fill={C.wood} opacity=".55" />
+      {[10, 16, 22].flatMap((x) => [11, 16, 21].map((y) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.2" fill={C.woodD} />))}
+      <Hi x={8} y={9} w={3.6} h={1.6} r={0} />
+    </>
+  ),
+  candy: (
+    <>
+      <path d="M2.5 9.5 9.5 13v6l-7 3.5Z" fill={C.pigD} />
+      <path d="M29.5 9.5 22.5 13v6l7 3.5Z" fill={C.pigD} />
+      <ellipse cx="16" cy="16" rx="8.5" ry="6.5" fill={C.pig} />
+      <path d="M24.5 16a8.5 6.5 0 0 1-8.5 6.5c3.5-1.5 5.2-4 5.2-6.5Z" fill={C.pigD} opacity=".45" />
+      <path d="M12 10.5 15 21.5M17 9.5l3 12" stroke="#fff" strokeWidth="1.8" opacity=".85" />
+      <Hi x={11.5} y={13} w={3} h={1.6} />
+    </>
+  ),
+  chips: (
+    <>
+      <path d="M7 4h18l-1.5 3.5L25 11l-2 15.5H9L7 11l1.5-3.5Z" fill={C.sun} />
+      <path d="M16 4h9l-1.5 3.5L25 11l-2 15.5h-7Z" fill={C.sunD} opacity=".45" />
+      <path d="M8 6h16M9.5 25h13" stroke={C.sunD} strokeWidth="1.6" strokeDasharray="1.6 1.6" />
+      <ellipse cx="16" cy="16.5" rx="5.4" ry="4.4" fill={C.red} />
+      <path d="M13.5 16.5h5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      <Hi x={10.5} y={10} w={1.8} h={3.6} r={0} />
+    </>
+  ),
+  can: (
+    <>
+      <path d="M6 9v14a10 4 0 0 0 20 0V9Z" fill={C.red} />
+      <path d="M16 13a10 4 0 0 0 10-4v14a10 4 0 0 1-10 4Z" fill={C.redD} opacity=".5" />
+      <path d="M6 15h20v5.5H6Z" fill="#fff" opacity=".9" />
+      <path d="M11 17.8h10" stroke={C.sky} strokeWidth="1.8" strokeLinecap="round" />
+      <ellipse cx="16" cy="9" rx="10" ry="4" fill={C.greyD} />
+      <ellipse cx="16" cy="9" rx="8" ry="2.7" fill="#E5E0EA" />
+    </>
+  ),
+  sack: (
+    <>
+      <path d="M9 7.5c2 2 12 2 14 0l2.2 3.2C28.5 15 29.5 19 29.5 22.5c0 4-3.5 6-13.5 6s-13.5-2-13.5-6C2.5 19 3.5 15 6.8 10.7Z" fill="#F4E8D4" />
+      <path d="M16 9.6c4 0 7-1 7-2.1l2.2 3.2C28.5 15 29.5 19 29.5 22.5c0 4-3.5 6-13.5 6Z" fill="#E3CFAD" />
+      <path d="M10 6.2h12" stroke={C.woodD} strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="16" cy="18.5" r="4" fill={C.leaf} />
+      <path d="M14.4 18.5h3.2M16 16.9v3.2" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
+    </>
+  ),
+  condiment: (
+    <>
+      <rect x="13" y="1.5" width="6" height="3.4" rx="1" fill={C.leafD} />
+      <path d="M13.8 4.5h4.4v3.2c3 1.2 4.3 3.3 4.3 6.3v12.5a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3V14c0-3 1.3-5.1 4.3-6.3Z" fill={C.sun} />
+      <path d="M16 4.5h2.2v3.2c3 1.2 4.3 3.3 4.3 6.3v12.5a3 3 0 0 1-3 3H16Z" fill={C.sunD} opacity=".5" />
+      <rect x="9.5" y="16" width="13" height="6" fill="#fff" opacity=".92" />
+      <Hi x={12.2} y={12} w={1.6} h={3.4} r={0} />
+    </>
+  ),
+  soap: (
+    <>
+      <rect x="3.5" y="12" width="21" height="14" rx="4.5" fill={C.sky} />
+      <path d="M14 12h6a4.5 4.5 0 0 1 4.5 4.5v5a4.5 4.5 0 0 1-4.5 4.5h-6Z" fill={C.skyD} opacity=".5" />
+      <circle cx="24.5" cy="8" r="4.2" fill="#fff" stroke={C.skyL} strokeWidth="1.6" />
+      <circle cx="17" cy="5.5" r="2.6" fill="#fff" stroke={C.skyL} strokeWidth="1.6" />
+      <Hi x={8.5} y={16} w={4.4} h={2} r={0} />
+    </>
+  ),
+  milk: (
+    <>
+      <path d="M9 9.5 12 4h8l3 5.5V26a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 9 26Z" fill="#fff" stroke="#E8E2EE" strokeWidth="1.6" />
+      <path d="M16 9.5h7V26a2.5 2.5 0 0 1-2.5 2.5H16Z" fill="#EEF3FF" />
+      <path d="M12 4h8l3 5.5H9Z" fill={C.skyL} />
+      <rect x="9" y="14" width="14" height="7.5" fill={C.sky} />
+      <circle cx="16" cy="17.8" r="2.2" fill="#fff" />
+    </>
+  ),
+  /* "Bakit Mali" badge: sign error */
+  plusMinus: (
+    <>
+      <circle cx="16" cy="16" r="13" fill={C.orange} />
+      <path d="M29 16a13 13 0 0 1-13 13c6-3 9-8 9-13Z" fill={C.orangeD} opacity=".6" />
+      <path d="M9 12h8M13 8v8" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+      <path d="M15 21.5h8" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+    </>
+  ),
+  /* scratchpad tools */
+  eraser: (
+    <>
+      <path d="M4 20 16 8l10 10-8 8h-8Z" fill={C.pig} />
+      <path d="M16 8l10 10-4 4L12 12Z" fill={C.pigD} opacity=".55" />
+      <path d="M4 20l6 6h8l-6-6Z" fill="#fff" stroke="#E8E2EE" strokeWidth="1.4" />
+      <path d="M13 27h15" stroke={C.greyD} strokeWidth="2" strokeLinecap="round" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M12 4h8v3h-8Z" fill={C.greyD} />
+      <rect x="5" y="7" width="22" height="4" rx="2" fill={C.greyD} />
+      <path d="M7.5 11h17l-1.6 15.2A2.5 2.5 0 0 1 20.4 28.5h-8.8a2.5 2.5 0 0 1-2.5-2.3Z" fill={C.grey} />
+      <path d="M16 11h8.5l-1.6 15.2A2.5 2.5 0 0 1 20.4 28.5H16Z" fill={C.greyD} opacity=".6" />
+      <path d="M12.5 15v9M16 15v9M19.5 15v9" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity=".85" />
+    </>
+  ),
+  /* framed check mark: verified / checked (e.g. check-digit stage) */
+  scanCheck: (
+    <>
+      <path d="M4 11V7a3 3 0 0 1 3-3h4M21 4h4a3 3 0 0 1 3 3v4M28 21v4a3 3 0 0 1-3 3h-4M11 28H7a3 3 0 0 1-3-3v-4" fill="none" stroke={C.sky} strokeWidth="3" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="7.5" fill={C.leaf} />
+      <path d="M8.5 16a7.5 7.5 0 0 0 15 0Z" fill={C.leafD} opacity=".5" />
+      <path d="m12.6 16.2 2.4 2.4 4.4-4.8" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      <Hi x={13} y={12.2} w={3} h={1.6} />
+    </>
+  ),
+  /* framed warning: look again (e.g. the "Bakit Mali" misconception badge) */
+  scanWarn: (
+    <>
+      <path d="M4 11V7a3 3 0 0 1 3-3h4M21 4h4a3 3 0 0 1 3 3v4M28 21v4a3 3 0 0 1-3 3h-4M11 28H7a3 3 0 0 1-3-3v-4" fill="none" stroke={C.sky} strokeWidth="3" strokeLinecap="round" />
+      <path d="M16 8.5 24 22.5H8Z" fill={C.sun} stroke={C.sun} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M16 8.5 24 22.5h-8Z" fill={C.sunD} opacity=".45" />
+      <path d="M16 13v4.4" stroke={C.ink} strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="16" cy="20.2" r="1.3" fill={C.ink} />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M5 19v5a3 3 0 0 0 3 3h16a3 3 0 0 0 3-3v-5" fill="none" stroke={C.ink} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13 4h6v10h4.5L16 22 8.5 14H13Z" fill={C.sky} />
+      <path d="M16 4h3v10h4.5L16 22Z" fill={C.skyD} opacity=".55" />
+      <Hi x={14.5} y={7} w={1.6} h={3.4} r={0} />
     </>
   ),
 

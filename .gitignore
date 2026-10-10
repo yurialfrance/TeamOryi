@@ -25,3 +25,6 @@ _to_delete
 *.sln
 *.sw?
 src/lib/img/svg/
+
+# temp sources for npm run cap:icons
+.capacitor-assets

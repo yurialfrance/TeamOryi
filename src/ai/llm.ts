@@ -128,6 +128,14 @@ export function loadModel(modelId: string): Promise<void> {
 
 export const aiReady = () => (!!engine || !!cpu) && useAi.getState().status === 'ready'
 
+/**
+ * Word-problem stories ("Kwento ni Pipo") are written ONLY by the 1.5B WebGPU model. Tested on real
+ * output: the 0.5B models (WebGPU Lite and the CPU build) produced Tagalog-shaped noise and took
+ * 1–3 minutes per story on CPU, so with them the plain code-written story is used instead.
+ */
+export const STORY_MODEL = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC'
+export const storyModelReady = () => aiReady() && useAi.getState().backend === 'gpu' && useAi.getState().modelId === STORY_MODEL
+
 export type ChatMsg = { role: 'system' | 'user' | 'assistant'; content: string }
 
 /** System first, then strictly alternating user/assistant, ending with user (merges duplicates) */
@@ -143,8 +151,70 @@ function tidy(messages: ChatMsg[]): ChatMsg[] {
   return [...sys.slice(0, 1), ...rest]
 }
 
+// ---------------------------------------------------------------- one job at a time
+// WebLLM and wllama each run ONE generation at a time. Live requests (Tutor, hints, "bakit mali")
+// always win: they interrupt a running background job (word-problem stories) and go first.
+let chain: Promise<unknown> = Promise.resolve()
+let liveWaiting = 0
+let stopBackground: (() => void) | null = null
+function exclusive<T>(job: () => Promise<T>): Promise<T> {
+  const run = chain.then(job, job)
+  chain = run.catch(() => undefined)
+  return run
+}
+
 /** Stream a completion. Falls back to `fallback` text (typed out) when the model isn't ready. */
 export async function stream(messages: ChatMsg[], onText: (full: string) => void, fallback: string, maxTokens = 220): Promise<string> {
+  if (aiReady()) {
+    liveWaiting++
+    stopBackground?.()
+    try {
+      return await exclusive(() => streamNow(messages, onText, fallback, maxTokens))
+    } finally {
+      liveWaiting--
+    }
+  }
+  return streamNow(messages, onText, fallback, maxTokens)
+}
+
+/**
+ * Background, non-streaming generation (word-problem stories). Yields to live requests: returns
+ * null without running if one is waiting, and is interrupted (→ null) if one arrives mid-way.
+ * Never throws; null means "no text — use the deterministic fallback".
+ */
+export async function generate(messages: ChatMsg[], opts: { temperature?: number; maxTokens?: number } = {}): Promise<string | null> {
+  if (!aiReady() || liveWaiting > 0) return null
+  return exclusive(async () => {
+    if (!aiReady() || liveWaiting > 0) return null
+    let aborted = false
+    const ctrl = new AbortController()
+    stopBackground = () => {
+      aborted = true
+      ctrl.abort()
+      void engine?.interruptGenerate()
+    }
+    try {
+      const msgs = tidy(messages)
+      const params = { messages: msgs, temperature: opts.temperature ?? 0.7, top_p: 0.95, max_tokens: opts.maxTokens ?? 90 }
+      let text = ''
+      if (useAi.getState().backend === 'cpu' && cpu) {
+        const r = (await cpu.createChatCompletion({ ...params, stream: false, abortSignal: ctrl.signal } as never)) as unknown as { choices: { message?: { content?: string } }[] }
+        text = r.choices[0]?.message?.content ?? ''
+      } else if (engine) {
+        const r = await engine.chat.completions.create({ ...params, stream: false })
+        text = r.choices[0]?.message?.content ?? ''
+      }
+      return aborted ? null : text
+    } catch (e) {
+      if (!aborted) console.warn('[Pipo AI] background generation failed', e)
+      return null
+    } finally {
+      stopBackground = null
+    }
+  })
+}
+
+async function streamNow(messages: ChatMsg[], onText: (full: string) => void, fallback: string, maxTokens: number): Promise<string> {
   if (!aiReady()) {
     let out = ''
     for (const word of fallback.split(/(\s+)/)) {
@@ -181,22 +251,38 @@ export async function stream(messages: ChatMsg[], onText: (full: string) => void
 
 export type AiLang = 'taglish' | 'english'
 
-const LEVEL: Record<string, string> = {
-  elem: 'a Grade 3–4 child (use very simple words)',
-  jhs: 'a Grade 7 student',
-  shs: 'a Senior High School student',
-  college: 'a college freshman',
+/**
+ * Who Pipo is talking to, from a Landas island id (grade1…grade10, or an SHS / college sampler).
+ * The old band ids (elem, jhs…) are mapped too, for anything still passing them.
+ */
+export function audience(level: string): string {
+  const legacy: Record<string, number> = { primary: 2, elem: 4, inter: 6, jhs: 7, g9: 9 }
+  const g = Number(/^grade(\d+)$/.exec(level)?.[1] ?? legacy[level] ?? NaN)
+  if (g >= 1 && g <= 3) return `a Grade ${g} child (age ${g + 5}–${g + 6}; use very short sentences and very simple words)`
+  if (g >= 4 && g <= 6) return `a Grade ${g} child (use simple words)`
+  if (g >= 7 && g <= 10) return `a Grade ${g} student`
+  if (['shs', 'genmath', 'stats', 'stem'].includes(level)) return 'a Senior High School student'
+  if (['college', 'mmw'].includes(level)) return 'a college freshman'
+  return 'a student'
 }
 
-const LANG_RULE: Record<AiLang, string> = {
+export const LANG_RULE: Record<AiLang, string> = {
+  // Was "mostly short, simple English sentences with Filipino words mixed in" — the model obeyed and
+  // answered in English. Taglish = Filipino sentence structure, English math words.
   taglish:
-    'Reply in simple, natural Taglish like a friendly Filipino tutor: mostly short, simple English sentences with common Filipino words mixed in (e.g. "kasi", "tapos", "ito", "diba", "galing", "kaya", "lang"). NEVER use deep, formal, or made-up Tagalog words.',
+    'Reply ONLY in natural Taglish like a friendly Filipino tutor: build every sentence in Filipino (use words like "ang", "ng", "natin", "ito", "kasi", "tapos", "kaya", "lang", "una", "sunod") and keep math words in English (factor, term, equation, fraction). Example style: "Una, i-factor natin ang 2 sa bawat term." NEVER answer in full English sentences. NEVER use deep, formal, or made-up Tagalog words.',
   english: 'Reply in simple, friendly English.',
+}
+
+/** Repeated at the END of every request — small models follow the last message far more than the system prompt */
+export const LANG_REMINDER: Record<AiLang, string> = {
+  taglish: 'Sagutin sa Taglish (Filipino ang pangungusap, English ang math words). Huwag sumagot sa buong English.',
+  english: 'Answer in simple English.',
 }
 
 export function systemPrompt(level: string, lang: AiLang = 'taglish') {
   return [
-    `You are Pipo, a cheerful pig who is a math tutor for Filipino students. You are talking to ${LEVEL[level] ?? 'a student'}.`,
+    `You are Pipo, a cheerful pig who is a math tutor for Filipino students. You are talking to ${audience(level)}.`,
     LANG_RULE[lang],
     'Keep answers short: 2–3 sentences. Never invent a new problem or new numbers. Never use letters like a, b unless they are in the problem.',
     'If the student says the answer is wrong, do not agree just to be polite — the calculator result is correct; kindly explain it again.',
@@ -224,7 +310,8 @@ function questionContext(q: Question) {
 export function hintMessages(level: string, q: Question, hintNo: number, lang: AiLang = 'taglish'): ChatMsg[] {
   return [
     ...baseMessages(level, lang),
-    { role: 'user', content: `${questionContext(q)}\n\nGive me hint #${hintNo + 1} only. Do NOT say the final answer. Explain just ONE small step in 1–2 sentences.` },
+    { role: 'user', content: `${questionContext(q)}\n\nGive me hint #${hintNo + 1} only. Do NOT say the final answer. Explain just ONE small step in 1–2 sentences.
+${LANG_REMINDER[lang]}` },
   ]
 }
 
@@ -242,7 +329,8 @@ export function whyWrongMessages(
     ...baseMessages(level, lang),
     {
       role: 'user',
-      content: `${questionContext(q)}\nMy wrong answer: ${userAnswer || '(none)'}${diagText}\n\nKindly address this exact mistake warmly, explain why this misconception occurs, and walk through the correct solution. 3–4 sentences.`,
+      content: `${questionContext(q)}\nMy wrong answer: ${userAnswer || '(none)'}${diagText}\n\nKindly address this exact mistake warmly, explain why this misconception occurs, and walk through the correct solution. 3–4 sentences.
+${LANG_REMINDER[lang]}`,
     },
   ]
 }

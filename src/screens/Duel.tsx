@@ -5,84 +5,14 @@ import { useGame } from '../store/game'
 import { Button } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { Pipo, type Mood } from '../components/Pipo'
+import { ReportSheet } from '../components/ReportSheet'
 import { Tex } from '../lib/math'
 import { sfx, haptic } from '../lib/sfx'
-import { ri, shuffle, distractors } from '../engine/rand'
+import { ri } from '../engine/rand'
+import { GRADE_BANDS, type GradeBand } from '../engine/topics'
+import { BAND_NOTE, createDuelPicker, type DuelQ, type Level } from '../games/duelBank'
 
-type Tier = 'easy' | 'medium' | 'hard'
 type DuelMode = 'bot' | 'pvp'
-interface DuelQ { id: string; prompt: string; tex?: string; choices: string[]; correct: number }
-
-let qid = 0
-function makeChoice(correct: number, spread: number) {
-  const d = distractors(correct, 3, spread)
-  let guard = 0
-  while (d.length < 3 && guard++ < 50) {
-    const extra = correct + d.length + 1 + ri(0, 2)
-    if (extra !== correct && !d.includes(extra)) d.push(extra)
-  }
-  const opts = shuffle([correct, ...d.slice(0, 3)])
-  return { choices: opts.map(String), correct: opts.indexOf(correct) }
-}
-
-function arithEasy(): DuelQ {
-  const op = ri(0, 1)
-  let a = ri(3, 20), b = ri(1, 15)
-  if (op === 1 && b > a) [a, b] = [b, a]
-  const correct = op === 0 ? a + b : a - b
-  const { choices, correct: ci } = makeChoice(correct, 5)
-  return { id: `q${qid++}`, prompt: op === 0 ? `${a} + ${b} = ?` : `${a} − ${b} = ?`, choices, correct: ci }
-}
-function percentEasy(): DuelQ {
-  const pct = [10, 20, 25, 50][ri(0, 3)]
-  const base = ri(2, 20) * 4
-  const correct = (pct / 100) * base
-  const { choices, correct: ci } = makeChoice(correct, Math.max(4, Math.round(correct * 0.3)))
-  return { id: `q${qid++}`, prompt: `${pct}% ng ${base} = ?`, choices, correct: ci }
-}
-function arithMedium(): DuelQ {
-  const a = ri(2, 12), b = ri(2, 12)
-  const correct = a * b
-  const { choices, correct: ci } = makeChoice(correct, Math.max(6, Math.round(correct * 0.25)))
-  return { id: `q${qid++}`, prompt: `${a} × ${b} = ?`, choices, correct: ci }
-}
-function oneStepEq(): DuelQ {
-  const x = ri(1, 15), a = ri(1, 15)
-  const b = x + a
-  const { choices, correct: ci } = makeChoice(x, 5)
-  return { id: `q${qid++}`, prompt: `Ano ang x?`, tex: `x + ${a} = ${b}`, choices, correct: ci }
-}
-function twoStepEq(): DuelQ {
-  const x = ri(1, 10), m = ri(2, 5), a = ri(1, 10)
-  const b = m * x + a
-  const { choices, correct: ci } = makeChoice(x, 4)
-  return { id: `q${qid++}`, prompt: `Ano ang x?`, tex: `${m}x + ${a} = ${b}`, choices, correct: ci }
-}
-function gcfGenD(): DuelQ {
-  const pairs: [number, number, number][] = [[12, 18, 6], [8, 12, 4], [20, 30, 10], [15, 25, 5], [16, 24, 8], [9, 15, 3], [14, 21, 7]]
-  const [a, b, correct] = pairs[ri(0, pairs.length - 1)]
-  const { choices, correct: ci } = makeChoice(correct, 5)
-  return { id: `q${qid++}`, prompt: `GCF(${a}, ${b}) = ?`, choices, correct: ci }
-}
-function quadEval(): DuelQ {
-  const a = ri(1, 3), xv = ri(1, 5)
-  const correct = a * xv * xv
-  const { choices, correct: ci } = makeChoice(correct, Math.max(8, correct))
-  return { id: `q${qid++}`, prompt: `Ano ang f(${xv})?`, tex: `f(x)=${a}x^2`, choices, correct: ci }
-}
-
-const BANK: Record<Tier, (() => DuelQ)[]> = {
-  easy: [arithEasy, arithEasy, percentEasy],
-  medium: [arithMedium, percentEasy, oneStepEq],
-  hard: [oneStepEq, twoStepEq, gcfGenD, quadEval],
-}
-const nextQuestion = (tier: Tier): DuelQ => BANK[tier][ri(0, BANK[tier].length - 1)]()
-
-const TIERS: { id: Tier; label: string; note: string }[] = [
-  { id: 'easy', label: 'Madali', note: 'Pagdaragdag, pagbabawas, percent' },
-  { id: 'medium', label: 'Katamtaman', note: 'Multiplication, percent, one-step equation' },
-  { id: 'hard', label: 'Mahirap', note: 'Equations, GCF, quadratic' },
-]
 
 interface PlayerState { score: number; combo: number }
 const P0: PlayerState = { score: 0, combo: 0 }
@@ -161,10 +91,19 @@ function DuelHalf({
 type Phase = 'setup' | 'countdown' | 'play' | 'final'
 
 export function DuelScreen() {
-  const { go, recordDuel, name: userName } = useGame()
+  const { go, recordDuel, name: userName, recordAttempt, set: setGame } = useGame()
   const [mode, setMode] = useState<DuelMode>('bot')
   const [phase, setPhase] = useState<Phase>('setup')
-  const [tier, setTier] = useState<Tier>('easy')
+  const [band, setBand] = useState<GradeBand>('g4-6')
+  const [reportOpen, setReportOpen] = useState(false)
+  /** two-player: attribute Manlalaro 1's answers to this learner's report */
+  const [p1IsLearner, setP1IsLearner] = useState(false)
+  const picker = useRef(createDuelPicker('g4-6'))
+  const [level, setLevel] = useState<Level>(1)
+  /** each player's FIRST pick this round: the honest measure of what they knew */
+  const firstPick = useRef<Partial<Record<1 | 2, { correct: boolean; ms: number }>>>({})
+  const roundStart = useRef(0)
+  const roundsWon = useRef({ 1: 0, 2: 0 })
   const [totalRounds, setTotalRounds] = useState(5)
   const [timerSec, setTimerSec] = useState(10)
   const [round, setRound] = useState(1)
@@ -185,7 +124,9 @@ export function DuelScreen() {
   useEffect(() => {
     if (phase !== 'countdown') return
     if (countdown <= 0) {
-      setQ(nextQuestion(tier))
+      setQ(picker.current.next())
+      firstPick.current = {}
+      roundStart.current = Date.now()
       setRoundOver(false)
       setTimeoutNotice(false)
       setP1Locked(false)
@@ -198,7 +139,27 @@ export function DuelScreen() {
     sfx.tap()
     const t = setTimeout(() => setCountdown((c) => c - 1), 600)
     return () => clearTimeout(t)
-  }, [phase, countdown, tier, timerSec])
+  }, [phase, countdown, timerSec])
+
+  /** Which seat's answers go into this learner's report (null = nobody, unattributed PvP) */
+  const learnerSeat: 1 | 2 | null = mode === 'bot' ? 2 : p1IsLearner ? 1 : null
+
+  /** End-of-round bookkeeping: record the learner's first pick, adapt the difficulty */
+  const concludeRound = (winner: 1 | 2 | null) => {
+    if (!q) return
+    if (winner) roundsWon.current[winner]++
+    let signal: boolean | undefined
+    if (learnerSeat) {
+      const mine = firstPick.current[learnerSeat]
+      if (mine) recordAttempt('duel', q.topic, mine.correct, mine.ms)
+      else if (!winner) recordAttempt('duel', q.topic, false, timerSec * 1000) // ran out of time
+      signal = mine ? mine.correct : winner ? undefined : false
+    } else {
+      signal = winner !== null // shared question: someone solved it -> harder; nobody -> easier
+    }
+    picker.current.feedback(signal)
+    setLevel(picker.current.level)
+  }
 
   // Advance to next round or finish
   const advanceRound = () => {
@@ -211,7 +172,9 @@ export function DuelScreen() {
       setPhase('final')
     } else {
       setRound((r) => r + 1)
-      setQ(nextQuestion(tier))
+      setQ(picker.current.next())
+      firstPick.current = {}
+      roundStart.current = Date.now()
       setRoundOver(false)
       setTimeoutNotice(false)
       setP1Locked(false)
@@ -230,6 +193,7 @@ export function DuelScreen() {
       haptic(15)
       setRoundOver(true)
       setTimeoutNotice(true)
+      concludeRound(null)
       if (mode === 'bot') setBotMood('shrug')
       if (botTimerRef.current) {
         clearTimeout(botTimerRef.current)
@@ -250,7 +214,7 @@ export function DuelScreen() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [phase, roundOver, q, timeLeft, mode, round, totalRounds, tier]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, roundOver, q, timeLeft, mode, round, totalRounds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bot opponent AI answering logic
   useEffect(() => {
@@ -262,23 +226,16 @@ export function DuelScreen() {
       return
     }
 
-    const delays: Record<Tier, [number, number]> = {
-      easy: [3400, 5600],
-      medium: [2300, 4200],
-      hard: [1500, 2900],
-    }
-    const accuracies: Record<Tier, number> = {
-      easy: 0.70,
-      medium: 0.85,
-      hard: 0.94,
-    }
+    // Pipo Bot plays at the match's current difficulty level
+    const delays: Record<Level, [number, number]> = { 1: [3400, 5600], 2: [2300, 4200], 3: [1500, 2900] }
+    const accuracies: Record<Level, number> = { 1: 0.7, 2: 0.85, 3: 0.94 }
 
-    const [minD, maxD] = delays[tier]
+    const [minD, maxD] = delays[level]
     const delay = ri(minD, maxD)
 
     botTimerRef.current = window.setTimeout(() => {
       if (roundOver) return
-      const isCorrect = Math.random() < accuracies[tier]
+      const isCorrect = Math.random() < accuracies[level]
       let pickIdx = q.correct
       if (!isCorrect) {
         const wrongs = q.choices.map((_, i) => i).filter((i) => i !== q.correct)
@@ -293,9 +250,12 @@ export function DuelScreen() {
         botTimerRef.current = null
       }
     }
-  }, [phase, mode, roundOver, q, p1Locked, tier]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, mode, roundOver, q, p1Locked, level]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startDuel = () => {
+    picker.current = createDuelPicker(band)
+    setLevel(1)
+    roundsWon.current = { 1: 0, 2: 0 }
     setP1(P0)
     setP2(P0)
     setRound(1)
@@ -310,8 +270,10 @@ export function DuelScreen() {
     if (!q || roundOver) return
     if (player === 1 && p1Locked) return
     if (player === 2 && p2Locked) return
+    firstPick.current[player] ??= { correct: choiceIdx === q.correct, ms: Date.now() - roundStart.current }
 
     if (choiceIdx === q.correct) {
+      concludeRound(player)
       haptic(20)
       sfx.correct()
       setRoundOver(true)
@@ -356,14 +318,18 @@ export function DuelScreen() {
       recorded.current = true
       const isWin = mode === 'bot' ? p2.score > p1.score : p1.score !== p2.score
       recordDuel(isWin)
+      if (mode === 'pvp') {
+        const s0 = useGame.getState().duelPvp
+        setGame({ duelPvp: { matches: s0.matches + 1, rounds: s0.rounds + totalRounds, p1Correct: s0.p1Correct + roundsWon.current[1], p2Correct: s0.p2Correct + roundsWon.current[2] } })
+      }
       const colors = ['#2F6BFF', '#FFC83D', '#FF8FB1', '#3DBE6B']
       confetti({ particleCount: 140, spread: 85, origin: { y: 0.4 }, colors })
     }
-  }, [phase, p1.score, p2.score, mode, recordDuel])
+  }, [phase, p1.score, p2.score, mode, recordDuel, setGame, totalRounds])
 
   if (phase === 'setup') {
     return (
-      <div className="h-full flex flex-col bg-white px-6 pt-8 pb-7 overflow-y-auto no-scrollbar">
+      <div className="h-full flex flex-col bg-white px-6 pt-8 pb-7 overflow-y-auto no-scrollbar screen-bg" style={{ ['--screen-tint' as string]: '#EBDDFB' }}>
         <button onClick={() => go('path')} className="text-2xl text-ink-soft font-black self-start mb-2" aria-label="Back">←</button>
         <div className="flex items-center gap-3 mb-1">
           <Icon name="versus" size={40} />
@@ -422,35 +388,46 @@ export function DuelScreen() {
                 }`}
                 style={{ ['--shadow' as string]: timerSec === sec ? 'var(--color-sun-dark)' : '#E0D9E8' }}
               >
-                ⏱️ {sec}s
+                <span className="inline-flex items-center gap-1"><Icon name="clock" size={16} /> {sec}s</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Antas / Difficulty */}
+        {/* Grade band — difficulty inside the band adapts to how the learner is doing */}
         <div className="mt-4">
-          <div className="font-black text-xs uppercase tracking-wide text-ink-soft mb-2">Antas (Difficulty)</div>
+          <div className="font-black text-xs uppercase tracking-wide text-ink-soft mb-2">Antas (Grade level)</div>
           <div className="space-y-2">
-            {TIERS.map((t) => (
+            {GRADE_BANDS.map((g) => (
               <button
-                key={t.id}
+                key={g.id}
                 type="button"
-                onClick={() => { sfx.tap(); setTier(t.id) }}
+                onClick={() => { sfx.tap(); setBand(g.id) }}
                 className={`btn3d w-full text-left flex items-center justify-between p-3 border-2 bg-white ${
-                  tier === t.id ? 'border-grape bg-[#F2EAFD]' : 'border-line'
+                  band === g.id ? 'border-grape bg-[#F2EAFD]' : 'border-line'
                 }`}
-                style={{ ['--shadow' as string]: tier === t.id ? 'var(--color-grape)' : '#E0D9E8' }}
+                style={{ ['--shadow' as string]: band === g.id ? 'var(--color-grape)' : '#E0D9E8' }}
               >
                 <div>
-                  <span className="block font-black text-[15px]">{t.label}</span>
-                  <span className="block text-xs text-ink-soft font-semibold">{t.note}</span>
+                  <span className="block font-black text-[15px]">{g.label}</span>
+                  <span className="block text-xs text-ink-soft font-semibold">{BAND_NOTE[g.id]}</span>
                 </div>
-                {tier === t.id && <Icon name="check" size={20} />}
+                {band === g.id && <Icon name="check" size={20} />}
               </button>
             ))}
           </div>
+          <p className="text-[11px] font-bold text-ink-soft mt-1.5">Lumalakas ang tanong kapag sunod-sunod ang tama, at gumagaan kapag nagkamali.</p>
         </div>
+
+        {mode === 'pvp' && (
+          <label className="card-soft mt-4 flex items-center gap-3 p-3 rounded-2xl cursor-pointer">
+            <input type="checkbox" checked={p1IsLearner} onChange={(e) => setP1IsLearner(e.target.checked)} className="w-5 h-5 accent-sky" />
+            <span className="text-[13px] font-bold text-ink leading-snug">
+              Si Manlalaro 1 ay si {userName?.trim() || 'ako'}
+              <span className="block text-[11px] text-ink-soft">Isasama ang mga sagot ni Manlalaro 1 sa assessment report. Kung hindi, kabuuang bilang lang ng laro ang itatala.</span>
+            </span>
+          </label>
+        )}
 
         {/* Rounds */}
         <div className="mt-4">
@@ -512,7 +489,7 @@ export function DuelScreen() {
 
   if (phase === 'play' && q) {
     const isBot = mode === 'bot'
-    const p1Name = isBot ? 'Pipo Bot 🤖' : 'Manlalaro 1'
+    const p1Name = isBot ? 'Pipo Bot' : 'Manlalaro 1'
     const p2Name = isBot ? (userName?.trim() || 'Ikaw') : 'Manlalaro 2'
 
     return (
@@ -590,7 +567,7 @@ export function DuelScreen() {
   const p2Label = isBot ? (userName?.trim() || 'Ikaw') : 'Manlalaro 2'
 
   return (
-    <div className="h-full flex flex-col bg-white px-6 pt-10 pb-8 text-center">
+    <div className="h-full flex flex-col bg-white px-6 pt-10 pb-8 text-center screen-bg" style={{ ['--screen-tint' as string]: '#EBDDFB' }}>
       <motion.div initial={{ scale: 0.4, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 12 }}>
         <Pipo mood={isBot ? (winner === 2 ? 'star' : winner === 1 ? 'trophy' : 'clap') : 'trophy'} size={170} className="mx-auto" />
       </motion.div>
@@ -599,9 +576,9 @@ export function DuelScreen() {
           'Tabla ang Laban!'
         ) : isBot ? (
           winner === 2 ? (
-            <>Panalo ka, <span className="text-pig-dark">{p2Label}</span>! 🎉</>
+            <>Panalo ka, <span className="text-pig-dark">{p2Label}</span>!</>
           ) : (
-            <>Panalo si <span className="text-[#1F4FD1]">Pipo Bot</span>! 🤖</>
+            <>Panalo si <span className="text-[#1F4FD1]">Pipo Bot</span>!</>
           )
         ) : (
           <>Panalo si <span style={{ color: winner === 1 ? '#1F4FD1' : '#D93355' }}>Manlalaro {winner}</span>!</>
@@ -626,7 +603,9 @@ export function DuelScreen() {
       <div className="flex-1" />
       <div className="space-y-3">
         <Button tone="pig" className="w-full" onClick={startDuel}>Duel Ulit</Button>
+        <Button tone="white" className="w-full" onClick={() => setReportOpen(true)}><Icon name="chartUp" size={20} /> Assessment Report</Button>
         <Button tone="white" className="w-full" onClick={() => go('path')}>Bumalik sa Landas</Button>
+        <ReportSheet open={reportOpen} onClose={() => setReportOpen(false)} kind="duel" />
       </div>
     </div>
   )

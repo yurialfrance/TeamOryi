@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { findStage } from '../curriculum/worlds'
-import type { Visual } from '../engine/types'
 import { useGame } from '../store/game'
 import { Pipo, type Mood } from '../components/Pipo'
 import { VisualView } from '../components/Visuals'
@@ -9,18 +8,6 @@ import { Tex } from '../lib/math'
 import { Button, ProgressBar } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { sfx } from '../lib/sfx'
-
-/** One simple illustrative visual per world, shown on the first teaching card. */
-const WORLD_VISUAL: Partial<Record<string, Visual>> = {
-  primary: { type: 'scene', icons: ['coins', 'coins', 'coins'] },
-  elem: { type: 'pizza', num: 3, den: 4 },
-  inter: { type: 'bar', num: 2, den: 3 },
-  jhs: { type: 'scale', left: 'x+3', right: '8' },
-  g9: { type: 'scene', icons: ['target', 'blocks', 'puzzle'] },
-  shs: { type: 'scene', icons: ['coins', 'bank', 'chartUp'] },
-  stats: { type: 'bar', num: 5, den: 8 },
-  college: { type: 'sequence', items: ['1', '1', '2', '3', '5', '8', '?'] },
-}
 
 /** Short "ituro muna" walkthrough shown before a stage's very first attempt. Basic, visual, one idea per card. */
 export function LearnScreen() {
@@ -30,7 +17,7 @@ export function LearnScreen() {
 
   if (!found) return null
   const { world, stage } = found
-  const items = world.guide
+  const items = stage.guide
   const total = items.length + 1 // + "ready" card
   const onReady = step >= items.length
 
@@ -66,8 +53,8 @@ export function LearnScreen() {
             {!onReady ? (
               <div className="rounded-2xl border-2 border-line p-4 sm:p-5 space-y-3 overflow-hidden shadow-sm" style={{ background: world.soft }}>
                 <div className="font-black text-lg text-center" style={{ color: world.colorDark }}>{items[step].title}</div>
-                {step === 0 && WORLD_VISUAL[world.id] && (
-                  <div className="flex justify-center py-1"><VisualView v={WORLD_VISUAL[world.id]!} /></div>
+                {step === 0 && stage.visual && (
+                  <div className="flex justify-center py-1"><VisualView v={stage.visual} /></div>
                 )}
                 {items[step].tex && (
                   <div className="w-full overflow-x-auto no-scrollbar py-2 px-1 flex justify-center items-center">

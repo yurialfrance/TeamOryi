@@ -31,7 +31,17 @@ export interface Achievement {
   done: (s: S) => boolean
   /** 0..1 — how close the learner is, for a gradually-coloring-in badge */
   progress: (s: S) => number
+  /** mascot badge artwork (public/mascot/badge-<art>.webp) when it differs from the id */
+  art?: string
 }
+
+/** One badge per island. Islands that inherited an old band's stages keep its artwork. */
+const ISLAND_BADGE: Record<string, string> = {
+  grade1: 'Batang Bilangero', grade2: 'Suki ng Tindahan', grade3: 'Bida sa Piyesta', grade4: 'Pizza Master', grade5: 'Karinderya Chef',
+  grade6: 'Barkada Boss', grade7: 'Timbangan Pro', grade8: 'Negosyante', grade9: 'Quadratic Hero', grade10: 'Bilog Master',
+  shs: 'Ipon Hari', genmath: 'Logic Lodi', stats: 'Data Detective', stem: 'Calculus Rookie', college: 'Kalikasan', mmw: 'Modern Math Master',
+}
+const BADGE_ART_FOR: Record<string, string> = { grade4: 'elem', grade7: 'jhs', shs: 'shs', college: 'college' }
 
 const worldDone = (s: S, id: string) => WORLDS.find((w) => w.id === id)!.stages.every((st) => s.completed[st.id])
 const worldProgress = (s: S, id: string) => {
@@ -45,13 +55,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'fire', title: 'Nag-aapoy', desc: '3-day streak', icon: 'flame', color: '#FF8A1F', done: (s) => s.streak >= 3, progress: (s) => clamp01(s.streak / 3) },
   { id: 'perfect', title: 'Perpekto', desc: 'Isang perfect lesson', icon: 'crown', color: '#FFC83D', done: (s) => s.perfectCount >= 1, progress: (s) => clamp01(s.perfectCount / 1) },
   { id: 'chest', title: 'Kolektor', desc: 'Magbukas ng 3 chest', icon: 'chest', color: '#D9893D', done: (s) => s.openedChests.length >= 3, progress: (s) => clamp01(s.openedChests.length / 3) },
-  { id: 'primary', title: 'Suki ng Tindahan', desc: 'Tapusin ang Grade 1–3 world', icon: 'store', color: '#FF4B6E', done: (s) => worldDone(s, 'primary'), progress: (s) => worldProgress(s, 'primary') },
-  { id: 'elem', title: 'Pizza Master', desc: 'Tapusin ang fractions world', icon: 'pizza', color: '#FF8A1F', done: (s) => worldDone(s, 'elem'), progress: (s) => worldProgress(s, 'elem') },
-  { id: 'inter', title: 'Barkada Boss', desc: 'Tapusin ang Grade 5–6 world', icon: 'blocks', color: '#00A6A6', done: (s) => worldDone(s, 'inter'), progress: (s) => worldProgress(s, 'inter') },
-  { id: 'jhs', title: 'Timbangan Pro', desc: 'Tapusin ang Grade 7 world', icon: 'scale', color: '#2F6BFF', done: (s) => worldDone(s, 'jhs'), progress: (s) => worldProgress(s, 'jhs') },
-  { id: 'g9', title: 'Quadratic Hero', desc: 'Tapusin ang Grade 9 world', icon: 'target', color: '#E64A8A', done: (s) => worldDone(s, 'g9'), progress: (s) => worldProgress(s, 'g9') },
-  { id: 'shs', title: 'Ipon Hari', desc: 'Tapusin ang Ipon Challenge', icon: 'coins', color: '#3DBE6B', done: (s) => worldDone(s, 'shs'), progress: (s) => worldProgress(s, 'shs') },
-  { id: 'stats', title: 'Data Detective', desc: 'Tapusin ang Stats world', icon: 'chartUp', color: '#1F9BD1', done: (s) => worldDone(s, 'stats'), progress: (s) => worldProgress(s, 'stats') },
-  { id: 'college', title: 'Kalikasan', desc: 'Tapusin ang MMW world', icon: 'sunflower', color: '#9B5DE5', done: (s) => worldDone(s, 'college'), progress: (s) => worldProgress(s, 'college') },
+  ...WORLDS.map((w): Achievement => ({
+    id: w.id, title: ISLAND_BADGE[w.id] ?? w.name, desc: `Tapusin ang ${w.tier === 'grade' ? `${w.level} island` : w.name}`,
+    icon: w.icon, color: w.color, art: BADGE_ART_FOR[w.id],
+    done: (s) => worldDone(s, w.id), progress: (s) => worldProgress(s, w.id),
+  })),
   { id: 'scholar', title: 'Iskolar', desc: 'Kumita ng 500 XP', icon: 'book', color: '#1F4FD1', done: (s) => s.xp >= 500, progress: (s) => clamp01(s.xp / 500) },
 ]

@@ -42,7 +42,7 @@ export function Stat({ icon, value, color, dim, onClick }: { icon: IconName; val
 export function TopStats() {
   const { streak, gems, hearts, lastLessonDate, level, go } = useGame()
   const activeToday = lastLessonDate === today()
-  const world = WORLDS.find((w) => w.id === level)!
+  const world = WORLDS.find((w) => w.id === level) ?? WORLDS[0]
   return (
     <div className="flex items-center justify-between w-full">
       <button onClick={() => go('profile')} className="w-10 h-9 rounded-xl border-2 border-[#FFD0DE] flex items-center justify-center hover:scale-105 active:scale-95 transition" style={{ background: world.soft }} aria-label="Level">
